@@ -1,78 +1,145 @@
-# SNACK TRACK — build roadmap
+# SNACK TRACK — roadmap
 
-The work queue for the daily build agent. Ordered. Check things off as they land,
-and never mark something done that hasn't been run and verified.
+One phase at a time, in order. Each phase has a goal, a short task list, and a
+**done when** line. Nothing moves to the next phase until the current one's
+"done when" is genuinely true and verified by running it.
 
-Plan this comes from: https://claude.ai/code/artifact/098c2efa-faa4-4f9c-a5e4-d4783dc9b4c9
-Working prototype (keep it running, it's the eval harness): `../calorie-tracker`
+**CURRENT PHASE: 1 — Foundation**
+
+Plan behind all of this: https://claude.ai/code/artifact/098c2efa-faa4-4f9c-a5e4-d4783dc9b4c9
+Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny uses it daily)
 
 ---
 
-## Phase 0 — groundwork that needs no Node, no accounts
+## Phase 0 — Groundwork ✅ done 2026-08-19
 
-- [ ] **Accuracy test set.** 50 real meals phrased the way Danny actually types them,
-      in `evals/meals.jsonl`, each with hand-checked calories and macros.
-- [ ] **Eval harness.** `evals/run.py` — runs a parser over the test set, reports
-      % within 10% on calories and each macro, and prints the worst misses.
-      Must run against the existing `../calorie-tracker/parse.py` first, so there's
-      a baseline number before any Claude call exists.
-- [ ] **Prompt draft.** `docs/parse-prompt.md` — the system prompt and JSON schema
-      for the real parse endpoint. Include the high-variance food rule and the
-      two-question cap.
-- [ ] **Database schema.** `db/schema.sql` — users, profiles, goals, entries,
-      foods, personal_food_library, suggestions_feedback, subscriptions.
-      Row-level security policies included, every table.
-- [ ] **API contract.** `docs/api.md` — every endpoint the app will call, with
-      request and response shapes. The prototype's `/api/parse` and `/api/suggest`
-      responses are the starting point; keep them stable.
-- [ ] **Screen inventory.** `docs/screens.md` — every screen, what's on it, what it
-      calls. Onboarding (8), day view, week view, suggestions, paywall, settings.
+**Goal:** somewhere to build, and a database to build against.
 
-## Phase 1 — foundation (blocked on Node + Supabase account)
+- [x] Repo, `build` branch, roadmap / build log / questions files
+- [x] Prototype put under version control
+- [x] Supabase project created (`snack-track`, free tier)
+- [x] Full schema applied with row level security on every table
+- [x] Security advisor clean
+- [x] `db/schema.sql` and `docs/supabase.md` in git, keys in gitignored `.env.local`
 
-- [ ] Expo app skeleton, runs on device
-- [ ] Supabase project, schema applied, RLS verified with a second test user
-- [ ] Auth: Sign in with Apple + Google + email fallback
+---
 
-## Phase 2 — core tracker
+## Phase 1 — Foundation
 
-- [ ] Day view: rings, macro bars, meal sections
-- [ ] Quick add + food search against the local DB
+**Goal:** a real app that opens on Danny's phone and signs him in.
+
+- [ ] Node.js installed *(blocked — QUESTIONS.md #1)*
+- [ ] GitHub repo connected and both branches pushed *(blocked — QUESTIONS.md #2)*
+- [ ] Expo project created, runs on device via Expo Go
+- [ ] Supabase client wired up, reading config from env
+- [ ] Email sign-in working end to end (Apple and Google come later — they need
+      developer accounts)
+- [ ] Row level security verified: sign in as a second test user, confirm they
+      cannot see the first user's rows
+
+**Done when:** Danny opens the app on his phone, signs in with an email link, and
+lands on an empty day view backed by the real database.
+
+---
+
+## Phase 2 — Core tracker
+
+**Goal:** everything the prototype does, but multi-user and on a phone.
+
+- [ ] Day view: calories, macro bars, meals
+- [ ] Add and delete entries
+- [ ] Food search against the `foods` table
+- [ ] Seed `foods` from USDA FoodData Central
 - [ ] Week view and streaks
 - [ ] Drinks: water, coffee, alcohol
 
-## Phase 3 — onboarding and targets
+**Done when:** Danny can stop using the localhost prototype for a full day without
+missing anything.
 
-- [ ] The 7 screens + optional preferences screen
+---
+
+## Phase 3 — Onboarding and targets
+
+**Goal:** a stranger can install it and get correct targets without help.
+
+- [ ] The seven onboarding screens, plus the optional food-preferences screen
 - [ ] Mifflin-St Jeor + activity math, with the arithmetic shown to the user
-- [ ] Editable targets
+- [ ] Editable targets, written to `target_history`
+- [ ] The safety floor: warn under ~1,200 cal, no goal weight below a healthy BMI
+
+**Done when:** a fresh account reaches a personalised target screen and the numbers
+match the plan's worked example for Danny's own stats.
+
+---
 
 ## Phase 4 — AI logging
 
-- [ ] Edge function holding the Claude key (never called from the client)
-- [ ] Structured output parse → resolver against food DB → confidence flags
-- [ ] Follow-up questions, capped at two, high-variance foods only
-- [ ] Correction capture → personal food library
+**Goal:** the feature the whole product exists for.
 
-## Phase 5 — suggestions
+- [ ] `evals/meals.jsonl` — 50 real meals with hand-checked numbers
+- [ ] `evals/run.py` — accuracy harness; get a baseline from the prototype's
+      `parse.py` before writing any Claude call
+- [ ] Edge function holding the Anthropic key, never called from the client
+- [ ] Structured-output parse → resolve against `foods` → confidence flags
+- [ ] Follow-up questions: high-variance foods only, capped at two
+- [ ] Corrections captured into `personal_foods`
+- [ ] Token metering into `ai_usage`
 
-- [ ] Preferences, card deck, nine-at-a-time batching
-- [ ] Accept-to-log in one tap
-- [ ] Skip/reject learning loop
+**Done when:** the harness reports the Claude pipeline beating the prototype's
+baseline on the 50-meal set, and Danny can log a day by typing sentences.
 
-## Phase 6 — paywall
+---
 
-- [ ] RevenueCat, entitlements via webhook, trial, restore
-- [ ] Web checkout via Stripe
+## Phase 5 — Suggestions
 
-## Phase 7 — health + nudges
+**Goal:** "what should I eat" on real data.
 
-- [ ] HealthKit read (needs a physical iPhone)
+- [ ] Port the macro-shape scoring from `../calorie-tracker/suggest.py`
+- [ ] Nine-at-a-time batching, three cards shown, background refill
+- [ ] One-tap accept-to-log
+- [ ] Skip and reject feedback into `suggestion_feedback`
+- [ ] The two guardrails: nothing under ~200 cal left, never suggest past the target
+
+**Done when:** the cards fit the shape of the remaining macros, not just the calories.
+
+---
+
+## Phase 6 — Paywall
+
+**Goal:** it can take money.
+
+- [ ] RevenueCat wired to App Store and Play products
+- [ ] Webhook → `subscriptions` table
+- [ ] Free tier limits enforced server-side: 5 AI logs/week, 1 suggestion set/day
+- [ ] Trial, restore purchases, visible cancel
+
+**Done when:** a test purchase flips the account to paid and unlocks the gated features.
+
+---
+
+## Phase 7 — Health and nudges
+
+**Goal:** it keeps people coming back.
+
+- [ ] HealthKit read: steps and active energy *(needs a physical iPhone)*
+- [ ] Activity-adjusted targets
 - [ ] Habit model: rolling median log time per meal slot
-- [ ] Local notifications, quiet hours, cancel-on-log
+- [ ] Local notifications with quiet hours, cancelled on log
+- [ ] The dinner nudge carries suggestions
 
-## Phase 8 — ship
+**Done when:** the app reminds Danny at the times he actually eats, and stops when
+he's already logged.
 
-- [ ] Empty states, offline behaviour, error copy
-- [ ] The safety guardrails: calorie floor, hide-numbers setting, disclaimer
-- [ ] TestFlight, then App Store review
+---
+
+## Phase 8 — Ship
+
+**Goal:** in the App Store.
+
+- [ ] Empty states, offline behaviour, real error copy
+- [ ] Hide-calorie-numbers setting, disclaimer, App Review health compliance
+- [ ] Icon, screenshots, listing copy
+- [ ] TestFlight with a handful of real people
+- [ ] Submit
+
+**Done when:** it's live and someone who isn't Danny has installed it.
