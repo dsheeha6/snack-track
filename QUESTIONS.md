@@ -33,6 +33,24 @@ change that dashboard setting myself with the tools I have.
 
 **Danny:**
 
+### Paste your Supabase service_role key, to finish seeding the food database
+Phase 2 needs `foods` populated so search has something to find. I loaded the
+first 800 of USDA's ~7,800 SR Legacy foods by hand as a proof it works, but
+the client's publishable key can't insert into `foods` — it's deliberately
+read-only to clients, same as everything else in `docs/supabase.md`'s security
+posture. Finishing the load needs the service_role key, which bypasses RLS and
+must never go in the app or get committed.
+
+1. Supabase dashboard → Project Settings → API → copy the `service_role` secret.
+2. Paste it below, under this question, in this file.
+3. Next run moves it straight to `.env.local` (gitignored) and replaces it here
+   with a note, then runs `scripts/seed_foods_usda.py` — it downloads SR
+   Legacy itself, clears the 800 test rows, and reloads all ~7,800 properly.
+   Pure Python stdlib, no install needed. Safe to re-run any time (it clears
+   `source='usda'` rows first, so it can't double up).
+
+**Danny:**
+
 ### Apple Developer Program — when?
 $99/year. Not needed until there's something to install on your phone, and Expo Go
 covers testing before that. Say the word when you want to enroll.

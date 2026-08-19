@@ -59,7 +59,8 @@ lands on an empty day view backed by the real database.
 - [ ] Day view: calories, macro bars, meals
 - [ ] Add and delete entries
 - [ ] Food search against the `foods` table
-- [ ] Seed `foods` from USDA FoodData Central
+- [ ] Seed `foods` from USDA FoodData Central — started early, off-phase (see
+      below), 800/~7,800 SR Legacy foods loaded, blocked on Danny for the rest
 - [ ] Week view and streaks
 - [ ] Drinks: water, coffee, alcohol
 

@@ -61,11 +61,38 @@ The Expo app exists now and email sign-in genuinely works end to end.
   hit it while testing. Not a blocker now, but flagged in `docs/supabase.md`
   as a pre-beta requirement (custom SMTP).
 
-**Next run:** if Danny's answered the phone-test question, read the result and
-either fix whatever broke or move the Phase 1 checkbox for real and start
-Phase 2 (day view, add/delete entries, food search). If it's still unanswered,
-do prep work that doesn't need his phone — e.g. start on the `foods` table
-seed script from USDA FoodData Central, which Phase 2 needs regardless.
+With Phase 1 genuinely done except the phone tap, and that being squarely
+Danny's to do, moved to Phase 2 prep that doesn't need him:
+
+- **Started seeding `public.foods`** from USDA FoodData Central's SR Legacy
+  dataset (public domain, ~7,800 standard foods — the well-curated whole-foods
+  set, not the 2GB+ user-submitted Branded Foods dump). Downloaded it, wrote
+  the food.csv/food_nutrient.csv parsing (join on fdc_id, pull energy/protein/
+  fat/carbs by nutrient ID, values are per-100g by USDA convention), and
+  loaded 800 rows by hand through the Supabase MCP as a correctness check —
+  verified the count and spot-checked values.
+- **Hit a real constraint, and built the actual fix instead of finishing the
+  same way**: `foods` is deliberately insert-blocked for every client role
+  (RLS — see `docs/supabase.md`), so loading it needs the service_role key,
+  which isn't in `.env.local` yet. Hand-relaying the remaining ~7,000 rows
+  through tool calls would have worked but is a bad way to move bulk data —
+  wrote `scripts/seed_foods_usda.py` instead: pure-stdlib Python, downloads
+  the dataset itself, parses it the same way, and bulk-loads via the REST API
+  with the service_role key once it's available. Idempotent (clears
+  `source='usda'` rows before reloading, so re-running for a future USDA
+  release, or after the manual 800, can't create duplicates). Dry-ran the
+  parsing half against the cached dataset — 7,793 rows, matches the manual
+  count exactly, values check out.
+- Queued the service_role key in QUESTIONS.md with exact steps. This is the
+  right long-term tool for any future bulk load too (Branded Foods later,
+  when that's wanted, is 2GB+ — hand-relaying that really isn't an option).
+
+**Next run:** if Danny's pasted the service_role key into QUESTIONS.md, move
+it to `.env.local`, run `scripts/seed_foods_usda.py` to finish the food seed,
+and check the phone-test answer while there. If the phone test passed, move
+Phase 1's checkbox and start Phase 2 proper (day view, add/delete entries,
+food search UI against the now-real `foods` table). If neither is answered,
+keep finding Phase 2 prep that doesn't need Danny.
 
 ---
 
