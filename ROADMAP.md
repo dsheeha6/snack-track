@@ -6,6 +6,10 @@ One phase at a time, in order. Each phase has a goal, a short task list, and a
 
 **CURRENT PHASE: 1 — Foundation**
 
+**Read `PRODUCT.md` before any decision about features, copy, or design.** The app
+is simple, easy, and doesn't judge anyone. That's the differentiator, not a slogan —
+it decides what gets built and what gets refused.
+
 Plan behind all of this: https://claude.ai/code/artifact/098c2efa-faa4-4f9c-a5e4-d4783dc9b4c9
 Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny uses it daily)
 

@@ -3,6 +3,7 @@
 The real app. The working prototype lives next door in `../calorie-tracker` and
 stays running — it's the eval harness and the daily driver until this replaces it.
 
+- `PRODUCT.md` — what this is and what it refuses to be. Read first.
 - `ROADMAP.md` — the work queue, in order
 - `BUILD_LOG.md` — what's actually been done, newest first
 - `QUESTIONS.md` — things only Danny can decide or do
