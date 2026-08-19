@@ -15,27 +15,6 @@ unattended — it needs an installer and admin rights.
 
 **Danny:**
 
-### 2. Create the GitHub repo and connect it
-The `gh` command isn't installed, and pushing needs your login, so this part is
-yours. Two minutes:
-
-1. Go to https://github.com/new
-2. Name it `snack-track`, set it to **Private**, and create it **without** a
-   README, .gitignore, or licence (the repo already has those)
-3. Then run these two commands in PowerShell, with your username swapped in:
-
-```
-cd "C:\Users\dshee\Claude Code\snack-track"; git remote add origin https://github.com/YOUR-USERNAME/snack-track.git
-```
-```
-git push -u origin main; git push -u origin build
-```
-
-The first push opens a browser window to sign in to GitHub — that's expected, and
-it only happens once. After that every daily run pushes automatically.
-
-**Danny:**
-
 ### 3. Apple Developer Program — when?
 $99/year. Not needed until there's something to install on your phone, and Expo Go
 covers testing before that. Say the word when you want to enroll.
@@ -54,3 +33,14 @@ Details in `docs/supabase.md`, DDL in `db/schema.sql`, keys in `.env.local`
 
 Apple and Google sign-in still need turning on in the Supabase dashboard, but that
 waits on the developer accounts — email sign-in works without them.
+
+### GitHub connected � done 2026-08-19
+Repo: https://github.com/dsheeha6/snack-track (private).
+Remote is set over HTTPS and Git Credential Manager already holds Danny's GitHub
+login, so pushes work with no prompt. `main` and `build` are both pushed.
+
+A dedicated SSH key was generated at `~/.ssh/id_ed25519_snacktrack` as a backup
+route � it is NOT registered on GitHub and isn't needed while HTTPS works. If
+pushes ever start failing on auth, add that key's `.pub` at
+https://github.com/settings/keys and switch the remote back to
+`git@github.com:dsheeha6/snack-track.git`.
