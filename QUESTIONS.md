@@ -8,13 +8,6 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN â€” blocking Phase 1
 
-### 1. Install Node.js
-Nothing in the Expo app can start without it. Get the LTS installer from
-https://nodejs.org, run it, then reply "done" below. I can't install it
-unattended â€” it needs an installer and admin rights.
-
-**Danny:**
-
 ### 3. Apple Developer Program â€” when?
 $99/year. Not needed until there's something to install on your phone, and Expo Go
 covers testing before that. Say the word when you want to enroll.
@@ -44,3 +37,16 @@ route — it is NOT registered on GitHub and isn't needed while HTTPS works. If
 pushes ever start failing on auth, add that key's `.pub` at
 https://github.com/settings/keys and switch the remote back to
 `git@github.com:dsheeha6/snack-track.git`.
+
+### Node.js installed — done 2026-08-19
+Node v24.19.0, npm 11.17.0, installed at `C:\Program Files
+odejs`.
+
+Gotcha for automated runs: processes started *before* the install have a stale
+PATH and won't see `node`. If `node --version` fails in a session, call the
+binaries directly — `"C:\Program Files
+odejs
+ode.exe"` and
+`"C:\Program Files
+odejs
+pm.cmd"` — or restart the app to pick up the PATH.
