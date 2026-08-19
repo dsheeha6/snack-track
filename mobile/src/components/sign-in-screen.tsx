@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
 
 export function SignInScreen() {
@@ -102,16 +102,16 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#3c3c4322',
+    borderColor: '#1E1B1622',
     borderRadius: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + 2,
     fontSize: 16,
-    color: '#000000',
-    backgroundColor: '#ffffff',
+    color: Brand.ink,
+    backgroundColor: Brand.paper,
   },
   button: {
-    backgroundColor: '#208AEF',
+    backgroundColor: Brand.green,
     borderRadius: Spacing.two,
     paddingVertical: Spacing.three,
     alignItems: 'center',
@@ -124,6 +124,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   error: {
-    color: '#e5484d',
+    color: Brand.coral,
   },
 });

@@ -40,4 +40,23 @@ it catches missing RLS policies, which is the failure that leaks other people's 
 
 - Turn on Apple and Google auth providers in the dashboard (needs Danny's developer accounts)
 - Seed `foods` from USDA FoodData Central
-- Verify RLS by signing in as a second test user and confirming they see nothing of the first
+- Custom SMTP before any real onboarding testing. The default Supabase mailer
+  (`mail.app.supabase.io`) is rate-limited to a couple of emails per hour — hit
+  it during Phase 1 testing. Fine for solo dev testing, not fine once more than
+  one or two people are signing up. Needs a provider (Resend/Postmark/etc.) and
+  an API key from Danny — queue in QUESTIONS.md when it's time.
+- Advisor also flags leaked-password protection as disabled — not applicable
+  today (the app only uses passwordless email OTP, no passwords exist to leak),
+  but worth a look if password auth ever gets added.
+
+## RLS verification (2026-08-19)
+
+Row level security was exercised directly against the deployed policies by
+impersonating two different signed-in users via `set local role authenticated;
+set local request.jwt.claims to '{"sub":"<uuid>","role":"authenticated"}'` in a
+SQL session, plus a plain `set local role anon` for the unauthenticated case.
+Results: a second user reading `entries` or `profiles` gets zero rows — even
+when explicitly filtering by the first user's `user_id` — and `anon` gets zero
+rows too. This is a stronger test than a UI-level "sign in as user B and look
+around" because it directly proves the policy predicate holds for arbitrary
+user IDs, not just the two test accounts used.

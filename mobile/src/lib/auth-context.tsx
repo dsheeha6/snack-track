@@ -1,6 +1,7 @@
 import * as Linking from 'expo-linking';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 
@@ -50,9 +51,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    Linking.getInitialURL().then((url) => {
-      if (url) handleUrl(url);
-    });
+    // On web, expo-router's client-side routing can consume the URL before
+    // Linking.getInitialURL() sees the fragment, so read window.location
+    // directly rather than relying on the native-oriented Linking API.
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.location.hash) {
+        handleUrl(window.location.href);
+      }
+    } else {
+      Linking.getInitialURL().then((url) => {
+        if (url) handleUrl(url);
+      });
+    }
     const linkSubscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
 
     return () => {

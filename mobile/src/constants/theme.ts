@@ -7,13 +7,31 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+// Brand tokens from PRODUCT.md / ../calorie-tracker/index.html. Full hand-drawn
+// treatment (wobble borders, offset shadows) is deferred — see PRODUCT.md's
+// porting note — this is just the color/type swap so the app isn't template-blue.
+export const Brand = {
+  cream: '#FFF3D6',
+  paper: '#FFFCF2',
+  ink: '#1E1B16',
+  green: '#12A150',
+  lime: '#C9E870',
+  yellow: '#FFC53D',
+  coral: '#FF6B4A',
+  pink: '#FF9EC4',
+  teal: '#2BB5AF',
+  blue: '#4C7DFF',
+  purple: '#9B6BFF',
+  clay: '#E8663C',
+} as const;
+
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: Brand.ink,
+    background: Brand.cream,
+    backgroundElement: Brand.paper,
+    backgroundSelected: '#F5EFD9',
+    textSecondary: '#6B6558',
   },
   dark: {
     text: '#ffffff',

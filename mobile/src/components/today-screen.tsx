@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   error: {
-    color: '#e5484d',
+    color: Brand.coral,
   },
   signOut: {
     alignItems: 'center',

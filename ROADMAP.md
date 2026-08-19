@@ -34,12 +34,18 @@ Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny use
 
 - [x] Node.js installed (v24.19.0, npm 11.17.0)
 - [x] GitHub repo connected and both branches pushed
-- [ ] Expo project created, runs on device via Expo Go
-- [ ] Supabase client wired up, reading config from env
-- [ ] Email sign-in working end to end (Apple and Google come later — they need
-      developer accounts)
-- [ ] Row level security verified: sign in as a second test user, confirm they
-      cannot see the first user's rows
+- [x] Expo project created (`mobile/`, SDK 57, expo-router). Bundles clean for
+      web, iOS, and Android — **on-device launch via Expo Go still needs Danny**,
+      see QUESTIONS.md
+- [x] Supabase client wired up, reading config from env (`mobile/.env.local`,
+      gitignored, `EXPO_PUBLIC_*`)
+- [x] Email sign-in working end to end — verified for real: requested a magic
+      link, read it out of Gmail, followed it, landed signed in on the Today
+      screen. Only the physical-device leg (tap the link on an iPhone) is unverified.
+- [x] Row level security verified: exercised the deployed policies directly
+      with impersonated JWTs for two different user IDs — a second user gets
+      zero rows from `entries` and `profiles`, even when explicitly querying by
+      the first user's ID. Anon gets zero rows too.
 
 **Done when:** Danny opens the app on his phone, signs in with an email link, and
 lands on an empty day view backed by the real database.

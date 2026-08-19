@@ -8,7 +8,30 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
-Nothing is blocking Phase 1. The one item below can wait.
+Nothing is fully blocked — both items below are things only you can do, not
+decisions that hold anything up.
+
+### Try the app on your phone
+Phase 1's real app exists now (`mobile/`) and everything I can verify without a
+device checks out: it bundles clean for iOS/Android/web, email sign-in works
+end-to-end (I proved it by requesting a real magic link, reading it out of your
+Gmail, and following it through to a signed-in session), and row-level security
+is locked down. The one thing only you can do is open it on an actual phone.
+
+1. Install **Expo Go** from the App Store if you don't have it.
+2. From `mobile/`, run `npx expo start` and scan the QR code with your phone's
+   camera (iOS) or the Expo Go app (Android).
+3. Sign in with your email, tap the link when it lands in your inbox, confirm
+   you land on a "Today" screen showing calories and macro targets (2200 /
+   165P / 220C / 70F — the schema defaults, real numbers from your database).
+
+If the magic-link tap doesn't redirect back into the app, it's almost certainly
+because Supabase's Auth → URL Configuration → Redirect URLs allowlist doesn't
+include the Expo Go redirect for your network. Reply here with what you saw and
+I'll adjust the redirect handling or walk you through adding the URL — I can't
+change that dashboard setting myself with the tools I have.
+
+**Danny:**
 
 ### Apple Developer Program — when?
 $99/year. Not needed until there's something to install on your phone, and Expo Go
