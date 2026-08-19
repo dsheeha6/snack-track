@@ -28,7 +28,7 @@ Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny use
 
 **Goal:** a real app that opens on Danny's phone and signs him in.
 
-- [ ] Node.js installed *(blocked — QUESTIONS.md #1)*
+- [x] Node.js installed (v24.19.0, npm 11.17.0)
 - [x] GitHub repo connected and both branches pushed
 - [ ] Expo project created, runs on device via Expo Go
 - [ ] Supabase client wired up, reading config from env
