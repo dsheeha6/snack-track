@@ -41,13 +41,18 @@ read-only to clients, same as everything else in `docs/supabase.md`'s security
 posture. Finishing the load needs the service_role key, which bypasses RLS and
 must never go in the app or get committed.
 
+**Do not paste the key into this file — it's tracked in git and would end up on
+GitHub.** Put it straight into the gitignored env file instead:
+
 1. Supabase dashboard → Project Settings → API → copy the `service_role` secret.
-2. Paste it below, under this question, in this file.
-3. Next run moves it straight to `.env.local` (gitignored) and replaces it here
-   with a note, then runs `scripts/seed_foods_usda.py` — it downloads SR
-   Legacy itself, clears the 800 test rows, and reloads all ~7,800 properly.
-   Pure Python stdlib, no install needed. Safe to re-run any time (it clears
-   `source='usda'` rows first, so it can't double up).
+2. Open `C:\Users\dshee\Claude Code\snack-track\.env.local` and paste it after
+   `SUPABASE_SERVICE_ROLE_KEY=`.
+3. Write just "done" below, so the next run knows to look.
+
+That run then executes `scripts/seed_foods_usda.py` — it downloads SR Legacy
+itself, clears the 800 test rows, and reloads all ~7,800 properly. Pure Python
+stdlib, no install needed. Safe to re-run any time (it clears `source='usda'`
+rows first, so it can't double up).
 
 **Danny:**
 
