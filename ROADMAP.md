@@ -56,13 +56,21 @@ lands on an empty day view backed by the real database.
 
 **Goal:** everything the prototype does, but multi-user and on a phone.
 
-- [ ] Day view: calories, macro bars, meals
-- [ ] Add and delete entries
-- [ ] Food search against the `foods` table
+- [x] Day view: calories, macro bars, meals — grouped by breakfast/lunch/
+      dinner/snacks with meal-colored dots matching the prototype's palette.
+      No red/scold state on the calorie bar, per PRODUCT.md — over-target
+      shows coral only as information, same as the prototype's bottle fill.
+- [x] Add and delete entries — modal with a food search box and a manual
+      cal/P/C/F form, meal picker defaulting to the time-of-day guess. Delete
+      is optimistic (removes from the list immediately, rolls back on error).
+- [x] Food search against the `foods` table — debounced `ilike` query using
+      the trigram index, verified returning real matches (see BUILD_LOG).
 - [ ] Seed `foods` from USDA FoodData Central — started early, off-phase (see
       below), 800/~7,800 SR Legacy foods loaded, blocked on Danny for the rest
 - [ ] Week view and streaks
-- [ ] Drinks: water, coffee, alcohol
+- [ ] Drinks: water, coffee, alcohol — no schema or prototype precedent yet;
+      needs a product decision on whether water/coffee count toward calories
+      before building
 
 **Done when:** Danny can stop using the localhost prototype for a full day without
 missing anything.

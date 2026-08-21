@@ -62,6 +62,25 @@ covers testing before that. Say the word when you want to enroll.
 
 **Danny:**
 
+### Drinks tracking: do water/coffee/alcohol count as calories?
+Phase 2's roadmap lists "drinks: water, coffee, alcohol" but neither the schema nor
+the prototype (`../calorie-tracker`) has ever had this — there's no precedent to
+copy, so I don't want to guess at the product call:
+
+1. Does a glass of water get logged at all, or is this purely about calorie-bearing
+   drinks (coffee with cream, alcohol) going through the same `entries` flow as food?
+2. If water is tracked, is it for hydration only (a separate count, doesn't touch the
+   calorie/macro targets) or does it need its own UI (a glass-count widget) rather
+   than living in a meal section?
+3. Does alcohol get its own macro treatment, or just log as calories with 0 P/C/F
+   like the prototype would for anything else?
+
+Simplest version — log any drink as a normal `entries` row in whichever meal slot,
+no new table — ships fastest and fits the existing model exactly. Answer here or
+just say "keep it simple" and that's what the next run will build.
+
+**Danny:**
+
 ---
 
 ## ANSWERED

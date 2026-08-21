@@ -5,6 +5,86 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-08-21 — Phase 2: day view, entries, food search — all real, none of it live-tested
+
+Both Phase 1 questions are still unanswered (checked `.env.local` directly for
+the service_role key, not just QUESTIONS.md — still blank). Nothing new is
+blocked on Danny; kept building Phase 2 work that doesn't need him.
+
+- **Day view, add/delete entries, food search — the core of Phase 2 — built
+  and wired to the real database**: `lib/meals.ts` (meal slots, colors ported
+  from the prototype's palette, time-of-day guess), `lib/entries.ts` and
+  `lib/foods.ts` (typed CRUD/search against `entries` and `foods`),
+  `MacroBar`, `EntryRow`, `AddEntryModal` components, and `TodayScreen`
+  rewritten to group real entries by meal, sum live totals against the
+  profile's targets, and open a search-or-manual-entry modal per meal.
+- **A real bug caught before it shipped, not after**: the first draft of
+  `addEntry()` never set `user_id`, which would have failed outright —
+  `entries.user_id` is `not null` and RLS requires `auth.uid() = user_id`.
+  Fixed by stamping it from `supabase.auth.getUser()` inside `addEntry()`
+  rather than trusting call sites to pass it.
+- **No red states, per PRODUCT.md**: the calorie bar shades coral only past
+  ~105% of target, same threshold and color as the prototype's bottle fill —
+  informational, not a warning. The "X over" label is plain text, no scold
+  copy anywhere in the new screens.
+- **How this was verified, given the constraint below**: `tsc --noEmit` clean,
+  `expo export --platform web` bundles clean (1.5MB single-file, no errors).
+  More importantly, ran the *exact* insert/select/delete query shapes from
+  `entries.ts` and the food search's `ilike` query from `foods.ts` directly
+  against the live Supabase project via the MCP, impersonating Danny's real
+  test user (`8c5c12bc-2c3a-4d2a-9499-6002c018d8d1`) with `set local
+  request.jwt.claims`: insert succeeded and round-tripped through a
+  `select ... where eaten_on = current_date` exactly matching `fetchEntries()`,
+  a second (fake) user's `request.jwt.claims` saw zero rows for it, delete
+  removed it cleanly, and `foods` search for "chicken" returned real USDA
+  rows. Confirmed no test rows were left behind afterward. This is a real
+  proof of the query/RLS shape, not a guess — but it is **not** the same as
+  tapping through the actual app.
+- **Could not open the app itself this run**: this was an unattended
+  scheduled-task session, and dev servers can't be launched without someone
+  present to approve the command — so no live Metro/Expo Go verification of
+  the new screens, no screenshot. Everything above is real, but the UI itself
+  is unverified by eye. Flagging this plainly rather than claiming a look I
+  didn't get. Whoever runs this interactively next should open it and check
+  the day view renders sanely before trusting it fully.
+- **Found and did NOT fix a real environment problem**: `expo export
+  --platform ios` and `--platform android` both failed at the Hermes
+  bytecode step with `spawn UNKNOWN`. Traced it to a Windows Application
+  Control policy blocking `node_modules/hermes-compiler/hermesc/win64-bin/
+  hermesc.exe` outright (confirmed via PowerShell: "An Application Control
+  policy has blocked this file") — not a code bug, not something in scope to
+  route around. Doesn't block Phase 1/2 work: local Expo Go testing goes
+  through Metro's dev bundle, not this production Hermes step, and Phase 8's
+  eventual store builds will most likely run through EAS Build (cloud) rather
+  than this machine. Worth knowing about before anyone tries a local
+  `--platform ios/android` export or a local EAS build on this machine.
+- **Accidentally triggered `expo lint`'s auto-install** (it silently added
+  eslint + eslint-config-expo to `package.json`/`package-lock.json` and wrote
+  an `eslint.config.js`, then failed anyway with "Cannot find module
+  'eslint'"). Reverted the package.json/lock changes and deleted the config
+  file rather than leave a half-working, unrequested lint setup in the repo.
+- Did **not** start Week view/streaks or Drinks tracking. Week view has a
+  prototype reference to port from (`../calorie-tracker/index.html`'s
+  bottle-chart week logic) but needed real screen navigation, which the app
+  doesn't have yet (only a single `/` route) — bigger than fitting in cleanly
+  alongside today's work. Drinks has **no schema and no prototype precedent
+  at all** — genuinely undesigned. Queued the design question in
+  QUESTIONS.md rather than guess at whether water/coffee count toward
+  calories.
+
+**Next run:** if either QUESTIONS.md item is answered, act on it first
+(service_role key → run `scripts/seed_foods_usda.py`; phone test result →
+either fix the redirect issue reported or check Phase 1's box for real and
+update the roadmap). Either way, **open the app for real this time** —
+`npx expo start --web` (interactive session only — blocked in unattended
+runs, see above) — and eyeball the new day view before building on top of it
+further. Then either add tab/stack navigation and build Week view from the
+prototype's logic, or get an answer on the drinks question and design that
+table. `foods` search only has 800 rows to search against until the seed
+finishes, so don't be alarmed if some obvious foods are missing yet.
+
+---
+
 ## 2026-08-19 (night) — Phase 1: real app, real sign-in, real RLS proof
 
 The Expo app exists now and email sign-in genuinely works end to end.
