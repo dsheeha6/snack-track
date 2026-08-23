@@ -1,6 +1,11 @@
 node_modules/
 .env
 .env.local
+# Catch editor-mangled copies too: Notepad silently saves ".env.local" as
+# ".env.local.txt", which the bare rule above misses and git would happily
+# commit with the service_role key inside it.
+.env*
+!.env.example
 *.log
 .expo/
 dist/
