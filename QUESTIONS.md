@@ -47,9 +47,28 @@ speaks SMTP:
 1. Enable 2-Step Verification, then make an App Password at
    https://myaccount.google.com/apppasswords (a normal password will not work).
 2. Supabase → Authentication → Emails → **Set up SMTP**:
-   host `smtp.gmail.com`, port `587`, username and sender both
-   `daniel.sheehan03@gmail.com`, password = the 16-character App Password,
-   sender name `SNACK TRACK`.
+
+   | Field | Value |
+   |---|---|
+   | **Host** | `smtp.gmail.com` — **the only field that is not his email address** |
+   | Port | `587` |
+   | Username | `daniel.sheehan03@gmail.com` |
+   | Password | the 16-character App Password |
+   | Sender email | `daniel.sheehan03@gmail.com` |
+   | Sender name | `SNACK TRACK` |
+
+   **This went wrong once already (2026-08-23)** and cost a debugging round: the
+   email address was entered in the **Host** field, so GoTrue tried to open an
+   SMTP connection to a server literally named `daniel.sheehan03@gmail.com` and
+   every send failed with a 500 `unexpected_failure`. The client-side message is
+   the useless "Error sending magic link email"; the real cause only shows up in
+   the auth logs as `dial tcp: lookup daniel.sheehan03@gmail.com: no such host`.
+   **If email breaks, read `auth_logs` before touching anything** — the browser
+   error says nothing.
+
+   Useful tell that SMTP is actually live: `auth_logs` records
+   `updating Email limiter from 2/1h to 30` on config reload. 2/hour means the
+   built-in mailer is still in charge; 30 means custom SMTP took effect.
 3. The **Source** editor unlocks; add the `{{ .Token }}` line above.
 
 Doing this clears three blockers at once, and the third is the one that really
