@@ -4,9 +4,16 @@ One phase at a time, in order. Each phase has a goal, a short task list, and a
 **done when** line. Nothing moves to the next phase until the current one's
 "done when" is genuinely true and verified by running it.
 
-**CURRENT PHASE: 2 — Core tracker** — every task in it is now built. The two
-"done when" checks that remain are Danny's: opening it on a phone (Phase 1) and
+**CURRENT PHASE: 2 — Core tracker** — every task in it is built, and as of
+2026-08-23 the app has been **signed into and driven by hand**, not just bundled:
+Today, Week and search across all 407,086 foods were verified against real data.
+
+Two "done when" checks remain, both Danny's: opening it on a phone (Phase 1) and
 using it for a real day instead of the prototype (Phase 2).
+
+**Before anything else next run**, clear the two sign-in bugs Danny hit on
+2026-08-23 — they're the first item in `QUESTIONS.md`, with `auth_logs` evidence
+that already rules out the obvious cause. Then Phase 3 is the open build work.
 
 **Read `PRODUCT.md` before any decision about features, copy, or design.** The app
 is simple, easy, and doesn't judge anyone. That's the differentiator, not a slogan —
@@ -48,15 +55,26 @@ Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny use
       code** typed in the app is now the default, which never leaves the app and
       so needs no redirect at all; **email+password** is there for people who
       expect it; and a **biometric lock** (Face ID / fingerprint) re-opens an
-      existing session. Needs `{{ .Token }}` added to the Supabase email
-      template — see QUESTIONS.md. Google and Apple are scoped there too.
+      existing session. Google and Apple are scoped in QUESTIONS.md.
+- [x] Email delivery working for real (2026-08-23): Danny added `{{ .Token }}`
+      to the Magic Link template and configured Gmail SMTP (no domain needed).
+      Proved end to end — code requested in the app, delivered, read back,
+      signed in. Note the OTP here is **8 digits**, not Supabase's default 6.
+- [ ] **Two sign-in bugs open** from Danny's first real use — a session
+      restoring without a code being entered, and the 60s resend throttle
+      surfacing as a raw error. Both written up with log evidence at the top of
+      QUESTIONS.md; first work for the next run.
+- [ ] Biometric lock unverified — `expo-local-authentication` reports no
+      hardware on web, so the lock screen has never rendered. Needs a device.
 - [x] Row level security verified: exercised the deployed policies directly
       with impersonated JWTs for two different user IDs — a second user gets
       zero rows from `entries` and `profiles`, even when explicitly querying by
       the first user's ID. Anon gets zero rows too.
 
-**Done when:** Danny opens the app on his phone, signs in with an email link, and
-lands on an empty day view backed by the real database.
+**Done when:** Danny opens the app on his phone, signs in, and lands on an empty
+day view backed by the real database.
+*(Signing in and landing on the real day view is proven — done on web 2026-08-23
+with an emailed code. Only the "on his phone" half is outstanding.)*
 
 ---
 
@@ -71,8 +89,12 @@ lands on an empty day view backed by the real database.
 - [x] Add and delete entries — modal with a food search box and a manual
       cal/P/C/F form, meal picker defaulting to the time-of-day guess. Delete
       is optimistic (removes from the list immediately, rolls back on error).
-- [x] Food search against the `foods` table — debounced `ilike` query using
-      the trigram index, verified returning real matches (see BUILD_LOG).
+- [x] Food search against the `foods` table — debounced query using the
+      trigram index. Driven by hand in the running app 2026-08-23 across all
+      407,086 rows: "starbucks", "quest bar", "oreo", "chobani" and "chicken
+      breast" all return sensible branded matches ("starbucks" returned zero
+      before the branded load). Result rows show the brand — without it a Quest
+      bar displays as just "APPLE PIE".
 - [x] Seed `foods` from USDA FoodData Central — two sources, two seeders,
       each idempotent on its own `source` value so they never clobber each
       other:

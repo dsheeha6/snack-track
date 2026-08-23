@@ -8,6 +8,65 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
+### 🐞 Sign-in bugs Danny hit 2026-08-23 — first work for the next run
+
+Two separate things, one confirmed and one needing repro. **Read the auth_logs
+evidence below before changing code** — one obvious-looking cause is already
+ruled out.
+
+#### 1. Signed in without entering the code — CAUSE NARROWED, NEEDS ONE ANSWER
+Danny: *"i can click the login with email and get the code but then when i got
+back i was logged in before i put in the code."*
+
+What `auth_logs` actually shows around it:
+
+| time | event |
+|---|---|
+| 03:29:01 | `Login`, `login_method: otp` — the agent's test sign-in |
+| 03:34:46 | `/logout` 204 — Danny signs out |
+| 03:35:00 | `/otp` 200 — Danny requests a code |
+| 03:35:40 | `/otp` 429 — "only request this after 19 seconds" |
+
+**There is no `Login` event and no successful `/verify` after 03:29:01.** That
+rules out the intuitive explanation — he did *not* get signed in by tapping the
+"Sign in" link still present in the email template, because that path always
+writes a `/verify` + `Login` pair and neither exists.
+
+So no new authentication happened. The app restored a session that was already
+in the browser. Leading theory: **the agent left a signed-in preview tab open on
+`localhost:8081`.** supabase-js refreshes its token on a timer and persists to
+`localStorage`, which tabs share, so that tab could rewrite the session moments
+after Danny's `signOut()` cleared it — and his tab reads it back on focus.
+
+**Danny — one question, this decides whether it's a real bug or agent litter:**
+were you in the same browser where the agent's preview tab was open, and was
+that tab still open? If yes, it's almost certainly the stale-tab artifact. If
+no — you used a different browser or a fresh window — then it's a genuine
+session-restore bug and takes priority.
+
+**Worth doing either way, since it costs little:**
+- `signOut()` should use the default global scope AND the app should treat the
+  sign-in screen as authoritative: if `SignInScreen` is mounted, clear any
+  session it finds rather than silently redirecting.
+- Consider dropping `{{ .ConfirmationURL }}` from the Magic Link template
+  entirely. The app asks for a code now; leaving a live one-tap link in the same
+  email is a second, untested way in that nobody needs, and it muddies exactly
+  this kind of diagnosis.
+
+#### 2. "Wait 19 seconds" reads like a failure — CONFIRMED, STRAIGHTFORWARD
+Real and reproducible: Supabase allows one code per address per **60 seconds**
+and returns a 429. The app dumps the raw message with no context, so it looks
+broken rather than deliberate.
+
+Fix (no decisions needed, just build it):
+- Disable **Resend code** for 60s after a send, with a live countdown
+  ("Resend in 43s") instead of an enabled button that errors.
+- Catch the 429 specifically and phrase it plainly — "One code a minute. Try
+  again in Ns." — rather than passing Supabase's wording through.
+- The initial "Send me a code" button needs the same guard; the 429 at 03:35:40
+  came from that button, not from Resend.
+
+
 ### Add the app's redirect URLs in Supabase — still needed, but no longer the top blocker
 **Downgraded 2026-08-23, and that still stands.** The code flow is now the
 default sign-in and needs no redirect at all — it's been proven working end to
@@ -51,18 +110,21 @@ port, which change between networks. `19006` is Expo's web port when 8081 is
 busy.) Leave Site URL alone; it's only the fallback.
 
 I can't do this one — it's a dashboard auth setting, and neither the Supabase MCP
-tools nor the service_role key can reach it. Once it's in, tell me and I'll sign
-in and finally check the Today and Week screens with real data, which is the last
-unverified piece of Phase 2.
+tools nor the service_role key can reach it. **No longer blocking anything:** the
+code flow made sign-in work without a redirect, and Today, Week and search were
+verified against real data on 2026-08-23.
 
 **Danny:**
 
 ### Try the app on your phone
 Phase 1's real app exists now (`mobile/`) and everything I can verify without a
-device checks out: it bundles clean for iOS/Android/web, email sign-in works
-end-to-end (I proved it by requesting a real magic link, reading it out of your
-Gmail, and following it through to a signed-in session), and row-level security
-is locked down. The one thing only you can do is open it on an actual phone.
+device checks out: it bundles clean for iOS/Android/web, sign-in works end to end
+(proved 2026-08-23 by requesting a code in the real UI, reading it out of your
+Gmail, and signing in), Today/Week/search were driven by hand against real data,
+and row-level security is locked down. **The one thing only you can do is open it
+on an actual phone** — and the biometric lock in particular is still unverified,
+because `expo-local-authentication` reports no hardware on web, so that screen
+has never rendered.
 
 **Do not tell Danny to install Expo Go from the App Store or Play Store. It does
 not work and it cannot work.** Corrected 2026-08-22 after he tried it and hit

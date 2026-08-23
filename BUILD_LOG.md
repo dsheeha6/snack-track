@@ -54,10 +54,29 @@ Getting there took two fixes on Danny's side and turned up three of mine.
   `getBiometricKind()` returns `none` there — so the lock UI is still unverified
   by eye and still needs a device.
 
-**Next run:** the phone is now the only thing between this and Phase 2 being
-genuinely done. Phase 3 (onboarding, Mifflin-St Jeor targets) is unblocked and
-is the obvious build work. Google sign-in still needs a free OAuth client from
-Danny; Apple still ties to the $99.
+**Danny used it himself right after this, and found two sign-in bugs.** Both are
+written up at the top of QUESTIONS.md and are the first work for the next run:
+
+1. **A session restored without a code being entered.** Diagnosed from
+   `auth_logs` rather than guessed, and the evidence *rules out* the obvious
+   explanation: there is no `Login` event and no successful `/verify` after the
+   agent's own 03:29:01 sign-in, so the still-present magic link in the email
+   was not followed — that path always writes a `/verify` + `Login` pair.
+   No new authentication happened at all; the app restored a session already in
+   the browser. Leading theory is agent litter: **I left a signed-in preview tab
+   open on localhost:8081**, and supabase-js refreshes its token on a timer and
+   writes it back to the shared `localStorage`, so it could have rewritten the
+   session moments after Danny's `signOut()` cleared it. One question to Danny
+   (same browser? tab still open?) settles whether it's a real bug.
+2. **The 60s resend throttle reads as a failure** — Supabase returns 429 "you
+   can only request this after 19 seconds" and the app passes the raw message
+   straight through with no countdown and no disabled state. Confirmed in the
+   logs at 03:35:40. Straightforward to fix, no decisions needed.
+
+**Next run:** clear those two first. After that the phone is the only thing
+between this and Phase 2 being genuinely done, and Phase 3 (onboarding,
+Mifflin-St Jeor targets) is the open build work. Google sign-in still needs a
+free OAuth client from Danny; Apple still ties to the $99.
 
 ---
 
