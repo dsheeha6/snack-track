@@ -32,9 +32,27 @@ on the **Confirm signup** template if you want the email+password signup to
 confirm by code too; otherwise that one still sends a link and needs the
 redirect URLs below.
 
+**You do NOT need custom SMTP for this.** Danny asked on 2026-08-23, reasonably —
+custom SMTP wants a sending domain and an app email address, neither of which
+exists yet. Editing a template is unrelated to it: Supabase's docs list
+"setting up and testing email templates" as an intended use of the *built-in*
+service. Nothing to buy, nothing to configure.
+
 Worth knowing: Supabase allows one code per address per 60 seconds and they
 expire after an hour. The app's "Resend code" button will surface that as an
 error if you hit it too fast — that's Supabase talking, not a bug.
+
+Two real limits of the built-in mailer, both fine for Danny testing alone:
+- **2 emails/hour.** An earlier session hit this.
+- **It only delivers to the project's team members.** Everyone else is refused.
+  Use the plain address — `daniel.sheehan03+snacktrack1@gmail.com` is a
+  *different* address as far as Supabase is concerned, even though Gmail
+  delivers it to the same inbox, so it may bounce.
+
+That second limit is why **custom SMTP is a pre-beta requirement** (already
+flagged in `docs/supabase.md`): the first time a person who isn't Danny tries to
+sign in, no email arrives. It needs a sending domain, so it's its own small
+project — worth doing when real people are close, not to test a 6-digit code.
 
 **Danny:**
 
