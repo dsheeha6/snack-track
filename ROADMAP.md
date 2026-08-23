@@ -67,7 +67,10 @@ lands on an empty day view backed by the real database.
       the trigram index, verified returning real matches (see BUILD_LOG).
 - [ ] Seed `foods` from USDA FoodData Central — started early, off-phase (see
       below), 800/~7,800 SR Legacy foods loaded, blocked on Danny for the rest
-- [ ] Week view and streaks
+- [x] Week view and streaks — bottom tabs (Today/Week), 7-day bar chart with
+      goal line ported from the prototype, tap a day to see its entries, plus
+      a simple "days logged in a row" streak (no prototype precedent for
+      streaks specifically, so this is a first design — see BUILD_LOG)
 - [ ] Drinks: water, coffee, alcohol — no schema or prototype precedent yet;
       needs a product decision on whether water/coffee count toward calories
       before building

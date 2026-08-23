@@ -27,6 +27,18 @@ export async function fetchEntries(eatenOn: string): Promise<Entry[]> {
   return data;
 }
 
+export async function fetchEntriesRange(fromDate: string, toDate: string): Promise<Entry[]> {
+  const { data, error } = await supabase
+    .from('entries')
+    .select(ENTRY_COLUMNS)
+    .gte('eaten_on', fromDate)
+    .lte('eaten_on', toDate)
+    .order('eaten_on', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
 export type NewEntry = {
   eaten_on: string;
   meal: MealSlot;

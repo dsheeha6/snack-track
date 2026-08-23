@@ -38,3 +38,10 @@ export function localDateString(date: Date = new Date()): string {
   const dd = String(date.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
+
+// Same day-math approach as the prototype's shift(): parse as calendar parts
+// (not a Date-object add) so it's immune to DST and month-length edge cases.
+export function shiftDate(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return localDateString(new Date(y, m - 1, d + days));
+}

@@ -1,9 +1,10 @@
+import { Redirect } from 'expo-router';
+import { StyleSheet } from 'react-native';
+
 import { useAuth } from '@/lib/auth-context';
 import { SignInScreen } from '@/components/sign-in-screen';
-import { TodayScreen } from '@/components/today-screen';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
-import { StyleSheet } from 'react-native';
 
 export default function IndexRoute() {
   const { session, loading } = useAuth();
@@ -16,7 +17,7 @@ export default function IndexRoute() {
     );
   }
 
-  return session ? <TodayScreen /> : <SignInScreen />;
+  return session ? <Redirect href="/(tabs)/today" /> : <SignInScreen />;
 }
 
 const styles = StyleSheet.create({

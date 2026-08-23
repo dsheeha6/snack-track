@@ -6,7 +6,7 @@ import type { Entry } from '@/lib/entries';
 
 type EntryRowProps = {
   entry: Entry;
-  onDelete: (id: string) => void;
+  onDelete?: (id: string) => void;
 };
 
 export function EntryRow({ entry, onDelete }: EntryRowProps) {
@@ -20,14 +20,16 @@ export function EntryRow({ entry, onDelete }: EntryRowProps) {
         </ThemedText>
       </View>
       <ThemedText type="smallBold">{Math.round(entry.calories)}</ThemedText>
-      <Pressable
-        onPress={() => onDelete(entry.id)}
-        hitSlop={10}
-        style={styles.deleteButton}
-        accessibilityLabel={`Delete ${entry.name}`}
-      >
-        <ThemedText themeColor="textSecondary">×</ThemedText>
-      </Pressable>
+      {onDelete && (
+        <Pressable
+          onPress={() => onDelete(entry.id)}
+          hitSlop={10}
+          style={styles.deleteButton}
+          accessibilityLabel={`Delete ${entry.name}`}
+        >
+          <ThemedText themeColor="textSecondary">×</ThemedText>
+        </Pressable>
+      )}
     </View>
   );
 }

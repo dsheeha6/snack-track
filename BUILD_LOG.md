@@ -5,6 +5,74 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-08-22 — Phase 2: tab navigation, Week view, a first take on streaks
+
+Both QUESTIONS.md items are still unanswered — checked `.env.local` directly
+(service_role key still blank) and the OPEN section's "Danny:" lines directly
+(both still empty), not just skimmed the file. Nothing new is blocked; kept
+building Phase 2's next unblocked item.
+
+- **Real screen navigation, finally**: added `app/(tabs)/_layout.tsx` using
+  expo-router's standard `Tabs` (not the `unstable-native-tabs` API — checked
+  the versioned SDK 57 docs first per `mobile/AGENTS.md`, and the stable,
+  cross-platform `Tabs` from `expo-router` itself is the better fit for an app
+  that also needs to bundle for web). Today and Week are now separate routes;
+  `/` redirects signed-in users into `/(tabs)/today` via `<Redirect>` instead
+  of switching components in place, so the URL/back-stack actually reflects
+  what's on screen.
+- **Week view built and wired to real data**: `WeekScreen`
+  (`components/week-screen.tsx`) ports the prototype's bar-chart-with-goal-line
+  and week stats (avg cal/day, avg protein, week total, days within 10% of
+  goal) from `../calorie-tracker/index.html`'s `renderWeek()` — same math,
+  same thresholds. Tapping a bar shows that day's entries below (reused
+  `EntryRow`, made its `onDelete` prop optional rather than forking a
+  read-only copy).
+- **Streaks: no prototype precedent, so this is a first design, not a port**.
+  Unlike drinks (queued as a real product question below), a logging streak
+  didn't seem worth blocking on Danny for — there's no calorie-math ambiguity,
+  just "count consecutive logged days." Implemented as: walk backwards from
+  today over a 30-day fetch window, don't break the streak just because today
+  isn't over yet (a day with zero entries only breaks it if it's *not* the
+  most recent day). Flagging the definition here in case Danny wants
+  something different (e.g. counting only *on-target* days, not just *any*
+  logging).
+- **New query added and proved against the live database, not just read**:
+  `fetchEntriesRange()` in `lib/entries.ts` (date-range `gte`/`lte` on
+  `eaten_on`, ordered for day-bucketing) — ran the exact query/group-by shape
+  through the Supabase MCP against Danny's real test user
+  (`8c5c12bc-2c3a-4d2a-9499-6002c018d8d1`) inside a rolled-back transaction:
+  inserted five dated test rows spanning the 30-day window, grouped sums came
+  back bucketed on the right days (e.g. two same-day entries summed to one
+  row), and a second impersonated user got zero rows for the identical query.
+  No test rows were left behind (transaction rolled back, not deleted after
+  the fact).
+- **Verified the same way as last run, for the same reason**: this is another
+  unattended scheduled-task session, so `expo start` can't be launched here —
+  confirmed by trying `preview_start` against the existing
+  `snack-track-mobile` launch config, which the harness correctly refused.
+  Instead: `tsc --noEmit` clean, and `expo export --platform web` bundled
+  clean (853 modules — up from before since `Tabs` pulls in
+  `@react-navigation/bottom-tabs`, no errors). The new tab bar, the bar
+  chart's visual layout, and tapping between days are **not** eyeballed —
+  someone should open this on a phone or `npx expo start --web` before
+  trusting the Week screen's look, same caveat as last time.
+- Did not touch `foods` seeding or the drinks design question — both still
+  sit on Danny, unchanged from last run.
+
+**Next run:** check `.env.local` and QUESTIONS.md directly again before
+assuming still blocked. If the service_role key landed, run
+`scripts/seed_foods_usda.py`. If the phone test or drinks answer landed, act
+on it. Otherwise: **open the app for real** (`npx expo start --web` from
+`mobile/`, interactive session only) and actually look at the new tab bar and
+Week screen before building further on top of it — this is the second run in
+a row shipping UI that's only been proven at the query/type level, not by
+eye. If that checks out, drinks is still the only clearly-scoped remaining
+Phase 2 item once Danny answers it; short of that, look for smaller
+Phase 2/3 prep (e.g. starting the Mifflin-St Jeor math for Phase 3, which
+doesn't depend on any open question).
+
+---
+
 ## 2026-08-21 — Phase 2: day view, entries, food search — all real, none of it live-tested
 
 Both Phase 1 questions are still unanswered (checked `.env.local` directly for
