@@ -5,6 +5,62 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-08-23 (night) — signed in for the first time, and three bugs that only showed up there
+
+**The app has now been used, not just bundled.** Every prior entry carried the
+same caveat — verified at the type/query level, never actually signed into.
+That's finally gone. Full loop proved end to end: requested a code in the real
+UI, it was delivered through Danny's newly-configured Gmail SMTP, read back out
+of his inbox, typed into the app, and it landed on `/today` signed in with his
+real targets (2200 / 165P / 220C / 70F) from the database.
+
+Getting there took two fixes on Danny's side and turned up three of mine.
+
+- **SMTP host mixup (his, and partly my fault).** Every send failed with a 500
+  and the useless client message "Error sending magic link email". `auth_logs`
+  had the truth: `dial tcp: lookup daniel.sheehan03@gmail.com: no such host` —
+  his email address was in the **Host** field, so GoTrue was dialling a mail
+  server named after his address. I'd handed him the settings as a table without
+  flagging that Host is the only field that *isn't* his email. Fixed in
+  QUESTIONS.md. **Rule learned: diagnose email failures from `auth_logs`, never
+  from the client error.** Useful tell that custom SMTP is actually live —
+  auth_logs prints `updating Email limiter from 2/1h to 30` on reload.
+- **The OTP is 8 digits here, not 6 — and I'd hardcoded 6.** The first real
+  email read `Your SNACK TRACK code is: 18027152`. My input did
+  `.slice(0, 6)` and validated `/^\d{6}$/`, so it would have silently truncated
+  a valid code to `180271` and rejected it. This is exactly the class of bug
+  that only appears when you use the thing. Fixed to accept `\d{6,10}` and
+  slice at 10 rather than swapping one hardcoded number for another, since the
+  length is a configurable Supabase setting.
+- **Search returned rows nobody could identify.** With 399,293 branded products
+  now in `foods`, searching "quest bar" returned a row displaying only
+  **"APPLE PIE"**. `lib/foods.ts` was selecting `brand` and the modal was
+  throwing it away. Now renders `QUEST BAR · 300 cal / 100 g`. Every branded
+  row has a brand (399,293/399,293), so this affects all of them.
+- **Tab bar rendered as "⏷⏷Today ⏷⏷Week"**. No `tabBarIcon` was set, so React
+  Navigation drew a placeholder that reads as a broken asset on web. Suppressed
+  the icon slot explicitly rather than installing an icon font for two glyphs.
+  Caught myself first "fixing" this by writing a comment explaining the
+  behaviour was intentional, which changed nothing — the absent icon *was* the
+  bug.
+- **Verified working, by eye and by data**: Today (macro bars, water card at
+  0/64 oz with the +8oz and custom controls, four meal sections), Week (streak
+  empty-state, 7-day chart with the goal line, avg/total/on-target stats, and a
+  per-day breakdown), and search across all 407,086 foods returning sensible
+  branded matches for quest bar / starbucks / oreo / chobani / chicken breast.
+  "starbucks" returned **zero** before the branded load; it returns real
+  products now.
+- **Tooling note**: the biometric lock correctly does not appear on web —
+  `getBiometricKind()` returns `none` there — so the lock UI is still unverified
+  by eye and still needs a device.
+
+**Next run:** the phone is now the only thing between this and Phase 2 being
+genuinely done. Phase 3 (onboarding, Mifflin-St Jeor targets) is unblocked and
+is the obvious build work. Google sign-in still needs a free OAuth client from
+Danny; Apple still ties to the $99.
+
+---
+
 ## 2026-08-23 (evening) — sign-in rebuilt around a code, plus a biometric lock
 
 Danny asked what the redirect URLs were even for, and assumed he'd have to

@@ -8,101 +8,6 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
-### Put the code in the sign-in email — one line, and the new sign-in needs it
-The app now asks for a **6-digit code** instead of a magic link (2026-08-23).
-That's faster and, more importantly, it never leaves the app, so it sidesteps
-the redirect problem below entirely.
-
-The one thing it needs is that the email actually contains a code. Supabase's
-default template sends a link and no code, so **as it stands, tapping "Send me a
-code" delivers an email with nothing to type in.** Verified against Supabase's
-own docs, not assumed.
-
-Go to
-https://supabase.com/dashboard/project/grltvenoqmzhgkfasvlb/auth/templates,
-pick the **Magic Link** template, and add a line with the token in it:
-
-```html
-<p>Your SNACK TRACK code is: <strong>{{ .Token }}</strong></p>
-```
-
-Keep or drop the existing `{{ .ConfirmationURL }}` link as you like — the code
-is what the app asks for now, but leaving the link costs nothing. Do the same
-on the **Confirm signup** template if you want the email+password signup to
-confirm by code too; otherwise that one still sends a link and needs the
-redirect URLs below.
-
-**Correction (2026-08-23): you DO need custom SMTP first.** I previously wrote
-the opposite here, based on Supabase's docs listing "setting up and testing
-email templates" as a use of the built-in service. The dashboard says otherwise
-and the dashboard wins — Danny's screenshot shows a banner reading *"Set up
-custom SMTP to edit templates"* with the Source editor greyed out. Danny was
-right, the doc was wrong.
-
-**But it needs no domain and no new email address.** Supabase takes "any email
-sending service that supports the SMTP protocol" and does not require a verified
-domain — a custom domain is a deliverability recommendation, not a gate. Gmail
-speaks SMTP:
-
-1. Enable 2-Step Verification, then make an App Password at
-   https://myaccount.google.com/apppasswords (a normal password will not work).
-2. Supabase → Authentication → Emails → **Set up SMTP**:
-
-   | Field | Value |
-   |---|---|
-   | **Host** | `smtp.gmail.com` — **the only field that is not his email address** |
-   | Port | `587` |
-   | Username | `daniel.sheehan03@gmail.com` |
-   | Password | the 16-character App Password |
-   | Sender email | `daniel.sheehan03@gmail.com` |
-   | Sender name | `SNACK TRACK` |
-
-   **This went wrong once already (2026-08-23)** and cost a debugging round: the
-   email address was entered in the **Host** field, so GoTrue tried to open an
-   SMTP connection to a server literally named `daniel.sheehan03@gmail.com` and
-   every send failed with a 500 `unexpected_failure`. The client-side message is
-   the useless "Error sending magic link email"; the real cause only shows up in
-   the auth logs as `dial tcp: lookup daniel.sheehan03@gmail.com: no such host`.
-   **If email breaks, read `auth_logs` before touching anything** — the browser
-   error says nothing.
-
-   Useful tell that SMTP is actually live: `auth_logs` records
-   `updating Email limiter from 2/1h to 30` on config reload. 2/hour means the
-   built-in mailer is still in charge; 30 means custom SMTP took effect.
-3. The **Source** editor unlocks; add the `{{ .Token }}` line above.
-
-Doing this clears three blockers at once, and the third is the one that really
-matters: template editing, the 2-emails/hour cap, and **delivery to addresses
-that aren't project team members** — without which literally nobody but Danny
-can ever receive a sign-in email. That was always required before anyone else
-could use the app; it just now also gates the code flow.
-
-Gmail is a testing answer, not a shipping one. A real sender domain on Resend or
-SES is the pre-launch upgrade, and *that* is when the domain question actually
-arrives.
-
-**Zero-setup fallback if he'd rather not:** **URL Configuration** is not gated.
-Adding the redirect URLs below makes magic-link sign-in work today on the
-default template — slower, still Danny-only delivery, but unblocked.
-
-Worth knowing: Supabase allows one code per address per 60 seconds and they
-expire after an hour. The app's "Resend code" button will surface that as an
-error if you hit it too fast — that's Supabase talking, not a bug.
-
-Two real limits of the built-in mailer, both fine for Danny testing alone:
-- **2 emails/hour.** An earlier session hit this.
-- **It only delivers to the project's team members.** Everyone else is refused.
-  Use the plain address — `daniel.sheehan03+snacktrack1@gmail.com` is a
-  *different* address as far as Supabase is concerned, even though Gmail
-  delivers it to the same inbox, so it may bounce.
-
-That second limit is why **custom SMTP is a pre-beta requirement** (already
-flagged in `docs/supabase.md`): the first time a person who isn't Danny tries to
-sign in, no email arrives. It needs a sending domain, so it's its own small
-project — worth doing when real people are close, not to test a 6-digit code.
-
-**Danny:**
-
 ### Add the app's redirect URLs in Supabase — still needed, but no longer the top blocker
 **Downgraded 2026-08-23.** The code flow above means ordinary sign-in no longer
 needs a redirect at all. These are still required for: the email+password
@@ -272,6 +177,43 @@ and more App Review surface for no reach.
 ---
 
 ## ANSWERED
+
+### Sign-in email code — done 2026-08-23, verified end to end
+Danny added `<p>Your SNACK TRACK code is: <strong>{{ .Token }}</strong></p>` to
+the **Magic Link** template and configured Gmail SMTP. Proven working: a code was
+requested in the real app, delivered from his Gmail, read back out of his inbox,
+typed in, and it signed in and landed on Today with real targets.
+
+Editing the template **did** require custom SMTP first — the dashboard gates the
+Source editor behind it, whatever the docs imply. I initially told him it didn't;
+he was right. Gmail SMTP needs no domain and no new address:
+
+| Field | Value |
+|---|---|
+| **Host** | `smtp.gmail.com` — **the only field that is not his email address** |
+| Port | `587` |
+| Username / Sender email | `daniel.sheehan03@gmail.com` |
+| Password | 16-character App Password (needs 2-Step Verification on) |
+| Sender name | `SNACK TRACK` |
+
+**Three things worth keeping, because they will recur:**
+
+1. **The email address went into the Host field**, so GoTrue dialled a mail
+   server named `daniel.sheehan03@gmail.com` and every send 500'd. The client
+   message — "Error sending magic link email" — is useless. `auth_logs` had the
+   real cause: `dial tcp: lookup ...: no such host`. **Diagnose email failures
+   from `auth_logs`, never from the client error.**
+2. **Tell that custom SMTP is actually live:** `auth_logs` prints
+   `updating Email limiter from 2/1h to 30` on config reload. `2/1h` means the
+   built-in mailer is still in charge.
+3. **This project's OTP is 8 digits, not Supabase's default 6** (e.g.
+   `18027152`). The app had `6` hardcoded and would have silently truncated
+   valid codes; it now accepts 6–10.
+
+Gmail is a testing answer, not a shipping one — it sends from Danny's personal
+address. A real sender domain on Resend or SES is the pre-launch upgrade, and
+that is when the domain question actually arrives. Rate limit is now 30/hour,
+and codes expire after an hour with one send per address per 60s.
 
 ### Drinks tracking — answered 2026-08-22, built 2026-08-23
 **Built exactly as specced below**, including every one of the "defaults to

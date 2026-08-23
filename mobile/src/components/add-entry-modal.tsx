@@ -153,6 +153,10 @@ export function AddEntryModal({ visible, defaultMeal, eatenOn, onClose, onSave }
                   <Pressable key={food.id} onPress={() => pickFood(food)} style={styles.resultRow}>
                     <ThemedText>{food.name}</ThemedText>
                     <ThemedText type="small" themeColor="textSecondary">
+                      {/* The brand is the whole point once branded products are in
+                          the table: searching "quest bar" surfaces a row named only
+                          "APPLE PIE", which is unidentifiable without it. */}
+                      {food.brand ? `${food.brand} · ` : ''}
                       {Math.round(food.calories)} cal / {food.serving_label}
                     </ThemedText>
                   </Pressable>

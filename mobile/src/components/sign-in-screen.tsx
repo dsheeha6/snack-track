@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 // Two ways in, code first.
 //
 // The code flow is the default because it's the fastest and the most robust:
-// six digits typed where you already are, no leaving for your inbox and no
+// a short code typed where you already are, no leaving for your inbox and no
 // redirect back, which is the leg that breaks on a phone. Password is there
 // for people who simply expect it -- PRODUCT.md says don't judge anyone, and
 // that includes how they want to log in.
@@ -32,7 +32,10 @@ export function SignInScreen() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const emailOk = /\S+@\S+\.\S+/.test(email);
-  const codeOk = /^\d{6}$/.test(code.trim());
+  // Supabase's OTP length is configurable (this project is set to 8, not the
+  // default 6). Accept the whole documented range rather than hardcoding a
+  // number that silently truncates a valid code if the setting ever changes.
+  const codeOk = /^\d{6,10}$/.test(code.trim());
   const passwordOk = password.length >= 8;
 
   const run = async (fn: () => Promise<{ error: string | null }>, onOk?: () => void) => {
@@ -89,12 +92,12 @@ export function SignInScreen() {
             <>
               <ThemedText type="subtitle">Enter your code</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                We sent a 6-digit code to {email.trim()}. It expires in an hour.
+                We sent a code to {email.trim()}. It expires in an hour.
               </ThemedText>
               <TextInput
                 value={code}
-                onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
-                placeholder="123456"
+                onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 10))}
+                placeholder="12345678"
                 placeholderTextColor="#9098a3"
                 keyboardType="number-pad"
                 textContentType="oneTimeCode"
@@ -117,7 +120,7 @@ export function SignInScreen() {
             <>
               <ThemedText type="small" themeColor="textSecondary">
                 {mode === 'code'
-                  ? 'Enter your email and we’ll send a 6-digit code. No password to remember.'
+                  ? 'Enter your email and we’ll send a sign-in code. No password to remember.'
                   : isSignUp
                     ? 'Create an account with an email and password.'
                     : 'Sign in with your email and password.'}
@@ -246,7 +249,7 @@ const styles = StyleSheet.create({
   },
   codeInput: {
     fontSize: 28,
-    letterSpacing: 8,
+    letterSpacing: 6,
     textAlign: 'center',
   },
   button: {

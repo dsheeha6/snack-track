@@ -12,6 +12,12 @@ export default function TabsLayout() {
         tabBarActiveTintColor: Brand.green,
         tabBarInactiveTintColor: theme.textSecondary,
         tabBarStyle: { backgroundColor: theme.backgroundElement },
+        // With no icon supplied, React Navigation renders a placeholder that
+        // shows as a "⏷" glyph on web and reads as a broken asset. Two text
+        // labels are enough for two tabs, and installing a whole icon font for
+        // two glyphs isn't worth it -- so suppress the icon slot explicitly.
+        tabBarIcon: () => null,
+        tabBarIconStyle: { display: 'none' },
       }}
     >
       <Tabs.Screen name="today" options={{ title: 'Today' }} />
