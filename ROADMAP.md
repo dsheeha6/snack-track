@@ -44,6 +44,12 @@ Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny use
 - [x] Email sign-in working end to end — verified for real: requested a magic
       link, read it out of Gmail, followed it, landed signed in on the Today
       screen. Only the physical-device leg (tap the link on an iPhone) is unverified.
+- [x] Sign-in reworked for speed (2026-08-23, Danny's ask): a 6-digit **email
+      code** typed in the app is now the default, which never leaves the app and
+      so needs no redirect at all; **email+password** is there for people who
+      expect it; and a **biometric lock** (Face ID / fingerprint) re-opens an
+      existing session. Needs `{{ .Token }}` added to the Supabase email
+      template — see QUESTIONS.md. Google and Apple are scoped there too.
 - [x] Row level security verified: exercised the deployed policies directly
       with impersonated JWTs for two different user IDs — a second user gets
       zero rows from `entries` and `profiles`, even when explicitly querying by

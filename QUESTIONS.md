@@ -8,7 +8,41 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
-### Add the app's redirect URLs in Supabase — 2 minutes, and it's blocking the phone test
+### Put the code in the sign-in email — one line, and the new sign-in needs it
+The app now asks for a **6-digit code** instead of a magic link (2026-08-23).
+That's faster and, more importantly, it never leaves the app, so it sidesteps
+the redirect problem below entirely.
+
+The one thing it needs is that the email actually contains a code. Supabase's
+default template sends a link and no code, so **as it stands, tapping "Send me a
+code" delivers an email with nothing to type in.** Verified against Supabase's
+own docs, not assumed.
+
+Go to
+https://supabase.com/dashboard/project/grltvenoqmzhgkfasvlb/auth/templates,
+pick the **Magic Link** template, and add a line with the token in it:
+
+```html
+<p>Your SNACK TRACK code is: <strong>{{ .Token }}</strong></p>
+```
+
+Keep or drop the existing `{{ .ConfirmationURL }}` link as you like — the code
+is what the app asks for now, but leaving the link costs nothing. Do the same
+on the **Confirm signup** template if you want the email+password signup to
+confirm by code too; otherwise that one still sends a link and needs the
+redirect URLs below.
+
+Worth knowing: Supabase allows one code per address per 60 seconds and they
+expire after an hour. The app's "Resend code" button will surface that as an
+error if you hit it too fast — that's Supabase talking, not a bug.
+
+**Danny:**
+
+### Add the app's redirect URLs in Supabase — still needed, but no longer the top blocker
+**Downgraded 2026-08-23.** The code flow above means ordinary sign-in no longer
+needs a redirect at all. These are still required for: the email+password
+signup confirmation link, Google and Apple sign-in when those land, and any
+magic link already in someone's inbox. So it's worth doing, just not urgent.
 **This is now the top item.** On 2026-08-23 I stopped guessing and tested it: I
 asked Supabase's admin API for a sign-in link with five different redirect URLs
 and checked which ones came back intact. Only one does.
@@ -140,9 +174,33 @@ flow that asks — is still unscoped and still Danny's call.
 
 **Danny:**
 
-### Apple Developer Program — when?
-$99/year. Not needed until there's something to install on your phone, and Expo Go
-covers testing before that. Say the word when you want to enroll.
+### Social sign-in: Google needs 10 minutes from you, Apple needs $99
+From Danny's 2026-08-23 ask for Google / Apple / phone logins. Email code,
+email+password, and biometric unlock are all built. The rest split by what they
+cost you:
+
+**Google** — free, but I can't create it: you make an OAuth client at
+https://console.cloud.google.com/apis/credentials (type "Web application"),
+paste the client ID and secret into Supabase's Google provider, and I wire the
+app side. Also add the redirect URLs above first, since OAuth uses them.
+
+**Apple — $99/year, and it's probably not optional once Google ships.** App
+Store guideline 4.8 requires an equivalent privacy-preserving login alongside
+any third-party social login. Our passwordless email code may well satisfy it
+on its own, but Sign in with Apple is the answer nobody gets rejected for. I'd
+treat Google and Apple as arriving together on iOS rather than assuming we can
+ship Google alone. The $99 also covers installing on your own iPhone, so it
+unblocks the phone test too.
+
+**Phone / SMS** — this one has a *recurring* cost, unlike the others. Supabase
+doesn't send SMS itself; you'd bring Twilio or similar and pay per message,
+forever, including for every failed and re-sent code. For a calorie tracker I'd
+skip it: the email code does the same job for free. Say so if you disagree.
+
+**Notion** — I'd leave this one out, and it's the only one I'd push back on
+outright. It's a workplace identity, and nobody reaches for their Notion login
+to record a burrito. Every extra provider is more config, more to keep working,
+and more App Review surface for no reach.
 
 **Danny:**
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -7,25 +7,74 @@ import { ThemedView } from '@/components/themed-view';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
 
+// Two ways in, code first.
+//
+// The code flow is the default because it's the fastest and the most robust:
+// six digits typed where you already are, no leaving for your inbox and no
+// redirect back, which is the leg that breaks on a phone. Password is there
+// for people who simply expect it -- PRODUCT.md says don't judge anyone, and
+// that includes how they want to log in.
+type Mode = 'code' | 'password';
+type Step = 'email' | 'code-sent';
+
 export function SignInScreen() {
-  const { signInWithEmail } = useAuth();
+  const { sendCode, verifyCode, signInWithPassword, signUpWithPassword } = useAuth();
+  const [mode, setMode] = useState<Mode>('code');
+  const [step, setStep] = useState<Step>('email');
+  const [isSignUp, setIsSignUp] = useState(false);
+
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
 
-  const isValidEmail = /\S+@\S+\.\S+/.test(email);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const handleSend = async () => {
-    if (!isValidEmail || status === 'sending') return;
-    setStatus('sending');
-    setErrorMessage(null);
-    const { error } = await signInWithEmail(email.trim());
-    if (error) {
-      setStatus('error');
-      setErrorMessage(error);
+  const emailOk = /\S+@\S+\.\S+/.test(email);
+  const codeOk = /^\d{6}$/.test(code.trim());
+  const passwordOk = password.length >= 8;
+
+  const run = async (fn: () => Promise<{ error: string | null }>, onOk?: () => void) => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const { error: err } = await fn();
+    if (err) setError(err);
+    else onOk?.();
+    setBusy(false);
+  };
+
+  const handleSendCode = () =>
+    run(() => sendCode(email), () => {
+      setCode('');
+      setStep('code-sent');
+    });
+
+  const handleVerify = () => run(() => verifyCode(email, code));
+
+  const handlePassword = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    if (isSignUp) {
+      const { error: err, needsConfirmation } = await signUpWithPassword(email, password);
+      if (err) setError(err);
+      else if (needsConfirmation) setNotice(`Confirm your address — we sent a link to ${email.trim()}.`);
     } else {
-      setStatus('sent');
+      const { error: err } = await signInWithPassword(email, password);
+      if (err) setError(err);
     }
+    setBusy(false);
+  };
+
+  const reset = () => {
+    setStep('email');
+    setCode('');
+    setError(null);
+    setNotice(null);
   };
 
   return (
@@ -35,50 +84,135 @@ export function SignInScreen() {
           SNACK TRACK
         </ThemedText>
 
-        {status === 'sent' ? (
-          <ThemedView type="backgroundElement" style={styles.card}>
-            <ThemedText type="subtitle">Check your email</ThemedText>
-            <ThemedText themeColor="textSecondary">
-              We sent a sign-in link to {email.trim()}. Open it on this device to continue.
-            </ThemedText>
-            <Pressable onPress={() => setStatus('idle')}>
-              <ThemedText type="linkPrimary">Use a different email</ThemedText>
-            </Pressable>
-          </ThemedView>
-        ) : (
-          <ThemedView type="backgroundElement" style={styles.card}>
-            <ThemedText themeColor="textSecondary">Sign in with your email — no password needed.</ThemedText>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              placeholderTextColor="#9098a3"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              style={styles.input}
-            />
-            {status === 'error' && errorMessage && (
-              <ThemedText themeColor="text" style={styles.error}>
-                {errorMessage}
+        <ThemedView type="backgroundElement" style={styles.card}>
+          {step === 'code-sent' ? (
+            <>
+              <ThemedText type="subtitle">Enter your code</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                We sent a 6-digit code to {email.trim()}. It expires in an hour.
               </ThemedText>
-            )}
-            <Pressable
-              onPress={handleSend}
-              disabled={!isValidEmail || status === 'sending'}
-              style={[styles.button, (!isValidEmail || status === 'sending') && styles.buttonDisabled]}
-            >
-              {status === 'sending' ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <ThemedText style={styles.buttonText}>Send sign-in link</ThemedText>
+              <TextInput
+                value={code}
+                onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+                placeholder="123456"
+                placeholderTextColor="#9098a3"
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                autoComplete="one-time-code"
+                autoFocus
+                style={[styles.input, styles.codeInput]}
+              />
+              <Feedback error={error} notice={notice} />
+              <Button label="Sign in" onPress={handleVerify} disabled={!codeOk} busy={busy} />
+              <View style={styles.linkRow}>
+                <Pressable onPress={() => run(() => sendCode(email), () => setNotice('Sent another code.'))} hitSlop={8}>
+                  <ThemedText type="linkPrimary">Resend code</ThemedText>
+                </Pressable>
+                <Pressable onPress={reset} hitSlop={8}>
+                  <ThemedText type="linkPrimary">Use a different email</ThemedText>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <>
+              <ThemedText type="small" themeColor="textSecondary">
+                {mode === 'code'
+                  ? 'Enter your email and we’ll send a 6-digit code. No password to remember.'
+                  : isSignUp
+                    ? 'Create an account with an email and password.'
+                    : 'Sign in with your email and password.'}
+              </ThemedText>
+
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                placeholderTextColor="#9098a3"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                style={styles.input}
+              />
+
+              {mode === 'password' && (
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Password (8+ characters)"
+                  placeholderTextColor="#9098a3"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  textContentType={isSignUp ? 'newPassword' : 'password'}
+                  style={styles.input}
+                />
               )}
-            </Pressable>
-          </ThemedView>
-        )}
+
+              <Feedback error={error} notice={notice} />
+
+              {mode === 'code' ? (
+                <Button label="Send me a code" onPress={handleSendCode} disabled={!emailOk} busy={busy} />
+              ) : (
+                <Button
+                  label={isSignUp ? 'Create account' : 'Sign in'}
+                  onPress={handlePassword}
+                  disabled={!emailOk || !passwordOk}
+                  busy={busy}
+                />
+              )}
+
+              <View style={styles.linkRow}>
+                <Pressable
+                  onPress={() => {
+                    setMode(mode === 'code' ? 'password' : 'code');
+                    setError(null);
+                    setNotice(null);
+                  }}
+                  hitSlop={8}
+                >
+                  <ThemedText type="linkPrimary">
+                    {mode === 'code' ? 'Use a password instead' : 'Email me a code instead'}
+                  </ThemedText>
+                </Pressable>
+                {mode === 'password' && (
+                  <Pressable onPress={() => { setIsSignUp(!isSignUp); setError(null); setNotice(null); }} hitSlop={8}>
+                    <ThemedText type="linkPrimary">{isSignUp ? 'I have an account' : 'Create one'}</ThemedText>
+                  </Pressable>
+                )}
+              </View>
+            </>
+          )}
+        </ThemedView>
       </SafeAreaView>
     </ThemedView>
+  );
+}
+
+function Feedback({ error, notice }: { error: string | null; notice: string | null }) {
+  if (error) return <ThemedText style={styles.error}>{error}</ThemedText>;
+  if (notice) return <ThemedText style={styles.notice}>{notice}</ThemedText>;
+  return null;
+}
+
+function Button({
+  label,
+  onPress,
+  disabled,
+  busy,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled: boolean;
+  busy: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || busy}
+      style={[styles.button, (disabled || busy) && styles.buttonDisabled]}
+    >
+      {busy ? <ActivityIndicator color="#ffffff" /> : <ThemedText style={styles.buttonText}>{label}</ThemedText>}
+    </Pressable>
   );
 }
 
@@ -110,6 +244,11 @@ const styles = StyleSheet.create({
     color: Brand.ink,
     backgroundColor: Brand.paper,
   },
+  codeInput: {
+    fontSize: 28,
+    letterSpacing: 8,
+    textAlign: 'center',
+  },
   button: {
     backgroundColor: Brand.green,
     borderRadius: Spacing.two,
@@ -123,7 +262,16 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
   },
+  linkRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
   error: {
     color: Brand.coral,
+  },
+  notice: {
+    color: Brand.green,
   },
 });

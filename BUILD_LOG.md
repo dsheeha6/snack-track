@@ -5,6 +5,73 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-08-23 (evening) — sign-in rebuilt around a code, plus a biometric lock
+
+Danny asked what the redirect URLs were even for, and assumed he'd have to
+build a redirect *page*. He doesn't — it's an allowlist, and the destination
+(`auth-callback.tsx`, `snacktrack://`) already exists. But the question was a
+good one, because it exposed that the magic link is the slow part of getting
+in: leave app → inbox → tap → come back. He asked for sign-in to be fast, with
+social logins and biometrics.
+
+Built the three he picked:
+
+- **Email code replaces the magic link as the default.** `signInWithOtp` without
+  `emailRedirectTo`, then `verifyOtp({type: 'email'})`. Six digits typed where
+  you already are. The important part is what this *removes*: with no redirect
+  in the flow, the redirect-allowlist blocker that's been sitting at the top of
+  QUESTIONS.md for two entries no longer applies to ordinary sign-in. It got
+  downgraded from "blocking" to "still needed for OAuth and password-signup
+  confirmation".
+- **Email + password**, `signUp` / `signInWithPassword`, with a real
+  `needsConfirmation` branch — with confirmation on, `signUp` returns a user but
+  no session, so the screen has to say "check your email" rather than assume it
+  worked.
+- **Biometric lock** via `expo-local-authentication` (read the v57 docs first,
+  per `mobile/AGENTS.md`; added the plugin's `faceIDPermission` to app.json).
+  Framed correctly: biometrics are **not** a login provider — Face ID proves
+  nothing to Supabase, it unlocks a session this device already holds. So it's a
+  lock over an existing session, not a way in.
+  - Applied in the **root layout**, not the index route. Gating `/` only would
+    let a deep link or restored navigation state land on `/(tabs)/today` with
+    the lock never shown.
+  - Re-locks on `AppState` background, otherwise it only ever runs on cold start
+    and is close to useless.
+  - Enabling it requires passing the check once, so nobody can turn on a lock
+    they can't open. Passcode fallback stays enabled — locking someone out of
+    their own food log because Face ID misread them in bad light would be its
+    own kind of judgement.
+
+- **The thing that would have shipped broken.** Checked Supabase's docs instead
+  of assuming: the default Magic Link template sends a link and **no code**, so
+  "Send me a code" would have delivered an email with nothing to type. Needs
+  `{{ .Token }}` added to the template — queued as the new top item in
+  QUESTIONS.md. Also confirmed the real limits while there: one code per address
+  per 60s, expiring after an hour, and the screen's copy now says the true hour.
+- **Verified in the browser**, which worked this time because the dev server was
+  running: bundles clean (944 modules), `tsc --noEmit` clean, and drove the real
+  UI — code ↔ password ↔ sign-up toggles all switch the right inputs and
+  buttons, and the submit button stays at 0.5 opacity for an empty *and* an
+  invalid email, going to 1.0 only on a valid one.
+- **Tooling note that cost time twice now**: synthetic `PointerEvent` dispatch
+  does *not* reliably trigger React Native Web `Pressable`. Inspecting the React
+  props showed the handler is `onClick` on the middle of three nested divs, and
+  a native **`el.click()`** works where the synthetic sequence silently does
+  nothing. Also: the page re-renders between separate `javascript_tool` calls,
+  so any interaction sequence has to run inside a single call with a
+  wait-for-element helper rather than being split across calls.
+- **Not verified**: an actual code arriving in an actual inbox, and the
+  biometric prompt itself — the first needs the template change, the second
+  needs a real device. Both are flagged rather than assumed working.
+
+**Next run:** if the template line is in, sign in with a code and finally look
+at Today, Week, and the 407k-food search in the real app — still the oldest
+unverified thing here. Google sign-in needs a free OAuth client from Danny;
+Apple ties to the $99 and probably has to ship alongside Google for App Store
+4.8. Phase 3 remains the unblocked build work.
+
+---
+
 ## 2026-08-23 (later) — 407k foods loaded, and the search that made them findable
 
 Danny asked to load "all of the food data ... since I added the api key". Two

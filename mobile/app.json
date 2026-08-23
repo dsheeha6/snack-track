@@ -32,6 +32,12 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow SNACK TRACK to unlock with Face ID so you can get to your day fast."
+        }
       ]
     ],
     "experiments": {

@@ -10,6 +10,7 @@ import { ThemedView } from '@/components/themed-view';
 import { WaterCard } from '@/components/water-card';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
+import { biometricLabel } from '@/lib/biometrics';
 import { addEntry, deleteEntry, fetchEntries, type Entry, type NewEntry } from '@/lib/entries';
 import { guessMealSlot, localDateString, MEAL_COLORS, MEAL_LABELS, MEAL_SLOTS, type MealSlot } from '@/lib/meals';
 import { supabase } from '@/lib/supabase';
@@ -48,7 +49,7 @@ function sumEntries(entries: Entry[]): Totals {
 }
 
 export function TodayScreen() {
-  const { session, signOut } = useAuth();
+  const { session, signOut, biometricKind, biometricEnabled, setBiometricEnabled } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [water, setWater] = useState<WaterEntry[]>([]);
@@ -224,6 +225,20 @@ export function TodayScreen() {
             </>
           ) : (
             <ThemedText themeColor="textSecondary">Loading your targets…</ThemedText>
+          )}
+
+          {biometricKind !== 'none' && (
+            <Pressable
+              onPress={() => setBiometricEnabled(!biometricEnabled)}
+              style={styles.signOut}
+              hitSlop={8}
+            >
+              <ThemedText type="linkPrimary">
+                {biometricEnabled
+                  ? `Turn off ${biometricLabel(biometricKind)} lock`
+                  : `Lock with ${biometricLabel(biometricKind)}`}
+              </ThemedText>
+            </Pressable>
           )}
 
           <Pressable onPress={signOut} style={styles.signOut}>
