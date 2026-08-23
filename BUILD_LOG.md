@@ -48,6 +48,20 @@ Built the three he picked:
   `{{ .Token }}` added to the template — queued as the new top item in
   QUESTIONS.md. Also confirmed the real limits while there: one code per address
   per 60s, expiring after an hour, and the screen's copy now says the true hour.
+- **Corrected same day, after Danny sent a screenshot.** I told him the template
+  edit needed no custom SMTP, citing the docs' line about the built-in service
+  being for "setting up and testing email templates". The dashboard disagrees:
+  a banner reads *"Set up custom SMTP to edit templates"* and the Source editor
+  is greyed out. He'd guessed SMTP was required and he was right. **When the
+  product UI and the docs disagree, believe the UI** — and prefer a screenshot
+  of the actual account over a docs page describing it.
+  The unblock still costs nothing: Supabase accepts any SMTP provider and does
+  not require a verified domain (that's a deliverability recommendation), so
+  Gmail SMTP with an App Password works with no domain and no new address.
+  Worth doing regardless of the code flow — the built-in mailer refuses to
+  deliver to anyone who isn't a project team member, so **no one but Danny could
+  ever have received a sign-in email**. That was always a prerequisite to a
+  second user; it merely now also gates the template.
 - **Verified in the browser**, which worked this time because the dev server was
   running: bundles clean (944 modules), `tsc --noEmit` clean, and drove the real
   UI — code ↔ password ↔ sign-up toggles all switch the right inputs and

@@ -32,11 +32,39 @@ on the **Confirm signup** template if you want the email+password signup to
 confirm by code too; otherwise that one still sends a link and needs the
 redirect URLs below.
 
-**You do NOT need custom SMTP for this.** Danny asked on 2026-08-23, reasonably —
-custom SMTP wants a sending domain and an app email address, neither of which
-exists yet. Editing a template is unrelated to it: Supabase's docs list
-"setting up and testing email templates" as an intended use of the *built-in*
-service. Nothing to buy, nothing to configure.
+**Correction (2026-08-23): you DO need custom SMTP first.** I previously wrote
+the opposite here, based on Supabase's docs listing "setting up and testing
+email templates" as a use of the built-in service. The dashboard says otherwise
+and the dashboard wins — Danny's screenshot shows a banner reading *"Set up
+custom SMTP to edit templates"* with the Source editor greyed out. Danny was
+right, the doc was wrong.
+
+**But it needs no domain and no new email address.** Supabase takes "any email
+sending service that supports the SMTP protocol" and does not require a verified
+domain — a custom domain is a deliverability recommendation, not a gate. Gmail
+speaks SMTP:
+
+1. Enable 2-Step Verification, then make an App Password at
+   https://myaccount.google.com/apppasswords (a normal password will not work).
+2. Supabase → Authentication → Emails → **Set up SMTP**:
+   host `smtp.gmail.com`, port `587`, username and sender both
+   `daniel.sheehan03@gmail.com`, password = the 16-character App Password,
+   sender name `SNACK TRACK`.
+3. The **Source** editor unlocks; add the `{{ .Token }}` line above.
+
+Doing this clears three blockers at once, and the third is the one that really
+matters: template editing, the 2-emails/hour cap, and **delivery to addresses
+that aren't project team members** — without which literally nobody but Danny
+can ever receive a sign-in email. That was always required before anyone else
+could use the app; it just now also gates the code flow.
+
+Gmail is a testing answer, not a shipping one. A real sender domain on Resend or
+SES is the pre-launch upgrade, and *that* is when the domain question actually
+arrives.
+
+**Zero-setup fallback if he'd rather not:** **URL Configuration** is not gated.
+Adding the redirect URLs below makes magic-link sign-in work today on the
+default template — slower, still Danny-only delivery, but unblocked.
 
 Worth knowing: Supabase allows one code per address per 60 seconds and they
 expire after an hour. The app's "Resend code" button will surface that as an
