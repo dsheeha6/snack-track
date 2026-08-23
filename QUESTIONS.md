@@ -9,11 +9,16 @@ answers, acts on them, and moves the item to ANSWERED.
 ## OPEN
 
 ### Add the app's redirect URLs in Supabase — still needed, but no longer the top blocker
-**Downgraded 2026-08-23.** The code flow above means ordinary sign-in no longer
-needs a redirect at all. These are still required for: the email+password
-signup confirmation link, Google and Apple sign-in when those land, and any
-magic link already in someone's inbox. So it's worth doing, just not urgent.
-**This is now the top item.** On 2026-08-23 I stopped guessing and tested it: I
+**Downgraded 2026-08-23, and that still stands.** The code flow is now the
+default sign-in and needs no redirect at all — it's been proven working end to
+end, so nothing is blocked on this. Redirect URLs are still required for three
+things: the email+password signup confirmation link, Google and Apple sign-in
+when those land, and any magic link already sitting in an inbox.
+
+(The paragraph below was written when magic links *were* the only way in and
+called this the top item. Keeping the evidence, dropping the urgency.)
+
+On 2026-08-23 I stopped guessing and tested it: I
 asked Supabase's admin API for a sign-in link with five different redirect URLs
 and checked which ones came back intact. Only one does.
 
