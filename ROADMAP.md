@@ -11,9 +11,10 @@ Today, Week and search across all 407,086 foods were verified against real data.
 Two "done when" checks remain, both Danny's: opening it on a phone (Phase 1) and
 using it for a real day instead of the prototype (Phase 2).
 
-**Before anything else next run**, clear the two sign-in bugs Danny hit on
-2026-08-23 — they're the first item in `QUESTIONS.md`, with `auth_logs` evidence
-that already rules out the obvious cause. Then Phase 3 is the open build work.
+**2026-08-23:** the resend-throttle bug is fixed. The other sign-in bug (a
+session restoring without a code) has two defensive fixes in but is still
+waiting on one answer from Danny — see the top item in `QUESTIONS.md`. Phase 3
+is the open build work in the meantime.
 
 **Read `PRODUCT.md` before any decision about features, copy, or design.** The app
 is simple, easy, and doesn't judge anyone. That's the differentiator, not a slogan —
@@ -60,10 +61,16 @@ Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny use
       to the Magic Link template and configured Gmail SMTP (no domain needed).
       Proved end to end — code requested in the app, delivered, read back,
       signed in. Note the OTP here is **8 digits**, not Supabase's default 6.
-- [ ] **Two sign-in bugs open** from Danny's first real use — a session
-      restoring without a code being entered, and the 60s resend throttle
-      surfacing as a raw error. Both written up with log evidence at the top of
-      QUESTIONS.md; first work for the next run.
+- [x] The 60s resend throttle no longer surfaces as a raw error (2026-08-23):
+      both the send and resend buttons disable with a live countdown, and a
+      429 that gets through anyway is phrased plainly. Traced through the
+      code but not eyeballed — no dev server in this unattended run.
+- [ ] **One sign-in bug still open**: a session restoring without a code being
+      entered. Two defensive fixes landed regardless (`signOut()` uses global
+      scope; the sign-in screen now rejects any session that arrives while it
+      believes it's signed out) — together they should make it structurally
+      impossible going forward. The root-cause question is still queued for
+      Danny in QUESTIONS.md.
 - [ ] Biometric lock unverified — `expo-local-authentication` reports no
       hardware on web, so the lock screen has never rendered. Needs a device.
 - [x] Row level security verified: exercised the deployed policies directly

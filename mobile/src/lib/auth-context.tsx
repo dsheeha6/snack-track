@@ -57,15 +57,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const [locked, setLocked] = useState(false);
   const handledUrls = useRef(new Set<string>());
+  // Mirrors `session` for synchronous reads inside the auth-state-change
+  // listener below, which closes over state from its first render only.
+  const hasSessionRef = useRef(false);
+  // True only while *this tab* has just asked Supabase for a session (code
+  // verified, password submitted, or a magic-link/OAuth redirect handled).
+  // supabase-js also syncs sessions across tabs (refreshed tokens get
+  // rewritten to the shared localStorage/BroadcastChannel), so a session can
+  // arrive here that this tab never asked for -- e.g. a stale signed-in
+  // preview tab left open elsewhere refreshing its token after this tab
+  // signed out. The sign-in screen is authoritative: while this tab believes
+  // it's signed out, a session it didn't request is treated as stale litter,
+  // not a login.
+  const expectingSessionRef = useRef(false);
+
+  const applySession = (s: Session | null) => {
+    hasSessionRef.current = !!s;
+    setSession(s);
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+      applySession(data.session);
       setLoading(false);
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, newSession) => {
+      // INITIAL_SESSION fires the moment this listener is registered, with
+      // whatever session was already in storage -- that's a normal cold-start
+      // restore, not a login, and must never be second-guessed here or every
+      // app reopen would sign the user straight back out.
+      if (event !== 'INITIAL_SESSION' && newSession && !hasSessionRef.current && !expectingSessionRef.current) {
+        supabase.auth.signOut({ scope: 'global' });
+        return;
+      }
+      applySession(newSession);
     });
 
     const handleUrl = async (url: string) => {
@@ -73,7 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       handledUrls.current.add(url);
       const params = sessionParamsFromUrl(url);
       if (params) {
+        expectingSessionRef.current = true;
         await supabase.auth.setSession(params);
+        expectingSessionRef.current = false;
       }
     };
 
@@ -134,21 +162,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const verifyCode = async (email: string, token: string) => {
+    expectingSessionRef.current = true;
     const { error } = await supabase.auth.verifyOtp({
       email: email.trim(),
       token: token.trim(),
       type: 'email',
     });
+    expectingSessionRef.current = false;
     return { error: error?.message ?? null };
   };
 
   const signInWithPassword = async (email: string, password: string) => {
+    expectingSessionRef.current = true;
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    expectingSessionRef.current = false;
     return { error: error?.message ?? null };
   };
 
   const signUpWithPassword = async (email: string, password: string) => {
+    expectingSessionRef.current = true;
     const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+    expectingSessionRef.current = false;
     // With email confirmation on, signUp returns a user but no session -- the
     // caller has to say "check your email" rather than assume it worked.
     return {
@@ -158,7 +192,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Global scope: revokes every session for this user, not just the local
+    // one -- otherwise a stale tab holding the same session keeps working
+    // (and can even resurrect it into this tab on its next token refresh).
+    await supabase.auth.signOut({ scope: 'global' });
     setLocked(false);
   };
 

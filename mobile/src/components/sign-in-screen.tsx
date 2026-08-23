@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -31,6 +31,28 @@ export function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Supabase allows one code per address per 60s and returns a 429 if you ask
+  // sooner. Tracked per-email so switching addresses doesn't inherit a wait
+  // that belongs to a different inbox. `now` just forces a re-render each
+  // second so the countdown text stays live.
+  const [cooldown, setCooldown] = useState<{ email: string; until: number } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!cooldown) return;
+    const id = setInterval(() => {
+      if (Date.now() >= cooldown.until) {
+        setCooldown(null);
+      } else {
+        setNow(Date.now());
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [cooldown]);
+  const cooldownSecondsLeft =
+    cooldown && cooldown.email === email.trim().toLowerCase()
+      ? Math.max(0, Math.ceil((cooldown.until - now) / 1000))
+      : 0;
+
   const emailOk = /\S+@\S+\.\S+/.test(email);
   // Supabase's OTP length is configurable (this project is set to 8, not the
   // default 6). Accept the whole documented range rather than hardcoding a
@@ -44,15 +66,35 @@ export function SignInScreen() {
     setError(null);
     setNotice(null);
     const { error: err } = await fn();
-    if (err) setError(err);
-    else onOk?.();
+    if (err) {
+      // Supabase's raw wording ("For security purposes, you can only request
+      // this after 19 seconds.") reads like a failure rather than a rate
+      // limit. Parse the wait out of it, start the cooldown from that exact
+      // number (covers the case where the button was still enabled -- e.g.
+      // right after a reload lost the local timer -- and the 429 is the
+      // first sign of it), and say it plainly instead.
+      const wait = err.match(/after (\d+) seconds?/i);
+      if (wait) {
+        const seconds = Number(wait[1]);
+        setCooldown({ email: email.trim().toLowerCase(), until: Date.now() + seconds * 1000 });
+        setNow(Date.now());
+        setError(`One code a minute. Try again in ${seconds}s.`);
+      } else {
+        setError(err);
+      }
+    } else {
+      onOk?.();
+    }
     setBusy(false);
   };
+
+  const startCooldown = () => setCooldown({ email: email.trim().toLowerCase(), until: Date.now() + 60_000 });
 
   const handleSendCode = () =>
     run(() => sendCode(email), () => {
       setCode('');
       setStep('code-sent');
+      startCooldown();
     });
 
   const handleVerify = () => run(() => verifyCode(email, code));
@@ -108,9 +150,26 @@ export function SignInScreen() {
               <Feedback error={error} notice={notice} />
               <Button label="Sign in" onPress={handleVerify} disabled={!codeOk} busy={busy} />
               <View style={styles.linkRow}>
-                <Pressable onPress={() => run(() => sendCode(email), () => setNotice('Sent another code.'))} hitSlop={8}>
-                  <ThemedText type="linkPrimary">Resend code</ThemedText>
-                </Pressable>
+                {cooldownSecondsLeft > 0 ? (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Resend in {cooldownSecondsLeft}s
+                  </ThemedText>
+                ) : (
+                  <Pressable
+                    onPress={() =>
+                      run(
+                        () => sendCode(email),
+                        () => {
+                          setNotice('Sent another code.');
+                          startCooldown();
+                        }
+                      )
+                    }
+                    hitSlop={8}
+                  >
+                    <ThemedText type="linkPrimary">Resend code</ThemedText>
+                  </Pressable>
+                )}
                 <Pressable onPress={reset} hitSlop={8}>
                   <ThemedText type="linkPrimary">Use a different email</ThemedText>
                 </Pressable>
@@ -154,7 +213,12 @@ export function SignInScreen() {
               <Feedback error={error} notice={notice} />
 
               {mode === 'code' ? (
-                <Button label="Send me a code" onPress={handleSendCode} disabled={!emailOk} busy={busy} />
+                <Button
+                  label={cooldownSecondsLeft > 0 ? `Resend in ${cooldownSecondsLeft}s` : 'Send me a code'}
+                  onPress={handleSendCode}
+                  disabled={!emailOk || cooldownSecondsLeft > 0}
+                  busy={busy}
+                />
               ) : (
                 <Button
                   label={isSignUp ? 'Create account' : 'Sign in'}

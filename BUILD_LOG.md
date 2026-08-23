@@ -5,6 +5,80 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-08-23 (later still) — one sign-in bug fixed, the other closed off from two directions
+
+Unattended scheduled run. Picked up exactly where the last entry said to:
+the two sign-in bugs Danny hit were the first item in QUESTIONS.md.
+
+- **The 60s resend throttle no longer reads as a failure.** Both the "Send me
+  a code" button and the "Resend code" link now disable for 60 seconds after
+  a send and show a live countdown ("Resend in 43s"). If a 429 gets through
+  anyway — the cooldown is client-side state, so a reload right after sending
+  would lose it — the app parses the wait out of Supabase's own message
+  (`/after (\d+) seconds?/i`) and starts the countdown from that exact number
+  instead of guessing 60, with plain copy ("One code a minute. Try again in
+  Ns.") replacing the raw wording. Built in `sign-in-screen.tsx`; no change
+  needed to `auth-context.tsx` for this one.
+  - Caught one bug in my own fix before it shipped: the countdown's
+    `setInterval` never stopped itself at zero, so it would have kept firing
+    a state update every second for the rest of the session once any cooldown
+    had ever started. Fixed to clear itself once `Date.now() >= until`.
+- **The session-restore bug got two defensive fixes, not a full diagnosis** —
+  the root cause still needs Danny's one-question answer in QUESTIONS.md
+  (same browser as the leftover preview tab, or not), which nothing here can
+  substitute for. But both fixes are worth having regardless, per the queued
+  "worth doing either way" note:
+  - `signOut()` now passes `{ scope: 'global' }` explicitly. It turns out this
+    was already the supabase-js default in this version — checked
+    `GoTrueClient.js` directly rather than assuming — so behavior doesn't
+    change, but intent is now explicit and it can't silently regress if a
+    future supabase-js version flips its default.
+  - **The sign-in screen is now authoritative.** `AuthProvider` tracks whether
+    *this tab* just asked for a session (code verified, password submitted, a
+    magic-link/OAuth redirect handled) via a ref set around each of those
+    calls. If `onAuthStateChange` delivers a session this tab never asked for,
+    while the tab currently holds no session, it's treated as stale litter —
+    signed out again immediately instead of silently accepted. This is the
+    exact shape of the leading theory: a stale tab's token-refresh timer
+    rewriting the shared session and this tab picking it up.
+  - **Caught a serious bug in this fix before shipping it, by reading the
+    library instead of assuming its behavior.** The first version gated on
+    "any session that appears while `hasSessionRef.current` is false," full
+    stop. But `onAuthStateChange` always fires once synchronously on
+    registration with whatever session Supabase already restored from
+    storage — confirmed by grepping `GoTrueClient.js` for `_emitInitialSession`
+    rather than trusting the docs' summary of it. That event carries a real,
+    legitimate session on nearly every normal app reopen. Without an
+    exemption, the fix would have signed every user out the instant they
+    reopened the app — a bug far worse than the one being fixed, and one that
+    would have shipped straight to Danny's phone the next time he opened it.
+    Fixed by exempting the `'INITIAL_SESSION'` event by name; the guard now
+    only fires on `SIGNED_IN`/`TOKEN_REFRESHED`-shaped events, which is what a
+    cross-tab broadcast actually replays.
+  - The two fixes reinforce each other: with `signOut()` now revoking
+    server-side, a stale tab's next refresh attempt should fail outright
+    rather than succeed and broadcast a new session — so the listener guard
+    is now a backstop for a path that shouldn't be reachable at all, not the
+    only line of defense.
+- **Verified**: `tsc --noEmit` clean and `expo export --platform web` bundled
+  clean (860 modules, no errors) after every change, including the two
+  self-caught bugs above. **Not verified**: actually watching the countdown
+  tick down or the stale-tab scenario in a running app — this is an
+  unattended run and `preview_start` was refused for the same reason prior
+  entries record (nobody present to approve a dev server). Traced through the
+  code carefully instead, including reading the actual auth-js source rather
+  than assuming its behavior, but this still needs eyes on a real session the
+  next time someone's driving the app by hand.
+- Did not touch the queued "drop `{{ .ConfirmationURL }}` from the Magic Link
+  template" suggestion — that's a Supabase dashboard change, still Danny's.
+
+**Next run:** if Danny's answered the one question in QUESTIONS.md, close out
+that item. Either way, Phase 3 (onboarding, Mifflin-St Jeor targets) is the
+next unblocked build work — nothing in Phase 1/2 is waiting on anything except
+Danny opening the app on his phone.
+
+---
+
 ## 2026-08-23 (night) — signed in for the first time, and three bugs that only showed up there
 
 **The app has now been used, not just bundled.** Every prior entry carried the

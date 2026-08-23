@@ -8,13 +8,38 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
-### 🐞 Sign-in bugs Danny hit 2026-08-23 — first work for the next run
+### 🐞 Sign-in bugs Danny hit 2026-08-23 — one fixed, one needs your answer
 
-Two separate things, one confirmed and one needing repro. **Read the auth_logs
-evidence below before changing code** — one obvious-looking cause is already
-ruled out.
+#### 2. "Wait 19 seconds" reads like a failure — FIXED 2026-08-23
+Built exactly as specced: the "Send me a code" button and the "Resend code"
+link both disable for 60s after a send and show a live countdown ("Resend in
+43s") instead of staying enabled and erroring. If a 429 gets through anyway
+(e.g. the local timer was lost on a reload), the app now parses the wait out
+of Supabase's message and shows "One code a minute. Try again in Ns." instead
+of the raw wording. `tsc --noEmit` and `expo export --platform web` both
+clean. **Not eyeballed** — this is an unattended run and the harness won't
+start a dev server without someone present, so the countdown ticking down and
+the button re-enabling at zero have not been watched happen, only traced
+through the code. Worth a look next time someone's driving the app by hand.
 
 #### 1. Signed in without entering the code — CAUSE NARROWED, NEEDS ONE ANSWER
+**Two defensive fixes went in regardless of your answer, since they cost
+little either way** (see BUILD_LOG for the full reasoning):
+- `signOut()` now uses Supabase's global scope explicitly, which revokes the
+  session everywhere, not just in the tab that clicked it — so a stale tab
+  can no longer keep working, or refresh a token and hand it back to this one.
+- The sign-in screen is now authoritative: if a session shows up in a tab
+  that never asked for one (no code just verified, no password just
+  submitted, no magic-link/OAuth redirect just handled) while that tab
+  believes it's signed out, it's treated as stale litter and signed out again
+  immediately rather than accepted. A normal app reopen restoring your last
+  real session is unaffected — only sessions that arrive *while already on
+  the sign-in screen* get this scrutiny.
+
+These two together should make the bug you hit structurally impossible going
+forward, regardless of which of the two causes below it turns out to have
+been. But the causal question below is still open and still worth answering,
+because it tells us whether there's a *third* thing to find.
 Danny: *"i can click the login with email and get the code but then when i got
 back i was logged in before i put in the code."*
 
@@ -42,30 +67,16 @@ after Danny's `signOut()` cleared it — and his tab reads it back on focus.
 were you in the same browser where the agent's preview tab was open, and was
 that tab still open? If yes, it's almost certainly the stale-tab artifact. If
 no — you used a different browser or a fresh window — then it's a genuine
-session-restore bug and takes priority.
+session-restore bug and worth digging into further even though the two fixes
+above should already prevent it from recurring.
 
-**Worth doing either way, since it costs little:**
-- `signOut()` should use the default global scope AND the app should treat the
-  sign-in screen as authoritative: if `SignInScreen` is mounted, clear any
-  session it finds rather than silently redirecting.
-- Consider dropping `{{ .ConfirmationURL }}` from the Magic Link template
-  entirely. The app asks for a code now; leaving a live one-tap link in the same
-  email is a second, untested way in that nobody needs, and it muddies exactly
-  this kind of diagnosis.
+**Still queued, not done (a Supabase dashboard setting, not code):** consider
+dropping `{{ .ConfirmationURL }}` from the Magic Link template entirely. The
+app asks for a code now; leaving a live one-tap link in the same email is a
+second, untested way in that nobody needs, and it muddies exactly this kind
+of diagnosis.
 
-#### 2. "Wait 19 seconds" reads like a failure — CONFIRMED, STRAIGHTFORWARD
-Real and reproducible: Supabase allows one code per address per **60 seconds**
-and returns a 429. The app dumps the raw message with no context, so it looks
-broken rather than deliberate.
-
-Fix (no decisions needed, just build it):
-- Disable **Resend code** for 60s after a send, with a live countdown
-  ("Resend in 43s") instead of an enabled button that errors.
-- Catch the 429 specifically and phrase it plainly — "One code a minute. Try
-  again in Ns." — rather than passing Supabase's wording through.
-- The initial "Send me a code" button needs the same guard; the 429 at 03:35:40
-  came from that button, not from Resend.
-
+**Danny:**
 
 ### Add the app's redirect URLs in Supabase — still needed, but no longer the top blocker
 **Downgraded 2026-08-23, and that still stands.** The code flow is now the
