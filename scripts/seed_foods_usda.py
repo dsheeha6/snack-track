@@ -35,10 +35,23 @@ BATCH_SIZE = 500
 csv.field_size_limit(sys.maxsize)
 
 
+def read_env_text(path):
+    """Read .env.local whatever encoding it got saved in.
+
+    Notepad and PowerShell's `>` default to UTF-16 on this machine, which made
+    a plain utf-8 read die with "UnicodeDecodeError: 0xff in position 0" and
+    look exactly like a missing key. Sniff the BOM instead.
+    """
+    raw = path.read_bytes()
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return raw.decode("utf-16")
+    return raw.decode("utf-8-sig")
+
+
 def load_env_local():
     env_path = ROOT / ".env.local"
     values = {}
-    for line in env_path.read_text(encoding="utf-8").splitlines():
+    for line in read_env_text(env_path).splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue

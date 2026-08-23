@@ -115,10 +115,19 @@ all — so the "ask your goals, show what matters" idea is largely a UI and
 onboarding job, not a schema job.
 
 **The nutrient side is a real migration.** Sugar would need a column on three
-tables — `entries`, `foods`, `personal_foods` — plus a re-seed, because
-`scripts/seed_foods_usda.py` only pulls four USDA nutrient IDs today
-(1008 calories, 1003 protein, 1004 fat, 1005 carbs). Total sugars is 2000 and
-fiber is 1079. The re-seed itself is cheap and idempotent (~2 min for 7,793 rows).
+tables — `entries`, `foods`, `personal_foods` — plus a re-seed, because the
+seeders only pull four USDA nutrient IDs today (1008 calories, 1003 protein,
+1004 fat, 1005 carbs). Total sugars is 2000 and fiber is 1079.
+
+**This got bigger on 2026-08-23**, when ~399k branded foods were loaded. The
+re-seed is now three steps, not one, and `WANT_NUTRIENTS` appears in *three*
+files that must be changed together:
+`scripts/seed_foods_usda.py`, `scripts/stage_branded.py`, and the selection in
+`scripts/seed_foods_branded.py`. Re-staging the branded dataset means
+re-parsing its 1.5GB `food_nutrient.csv` (~10 min) and re-uploading ~399k rows
+(~20 min) on top of the cheap 7,793-row SR Legacy re-seed. Still entirely
+automated — just budget the time, and don't do it twice, which is exactly why
+sugar and fiber go in together.
 
 **Danny confirmed fiber on 2026-08-22:** add **sugar and fiber together**, not
 sugar alone. One migration and one re-seed instead of two. So when this phase

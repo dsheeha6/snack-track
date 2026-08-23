@@ -67,10 +67,17 @@ lands on an empty day view backed by the real database.
       is optimistic (removes from the list immediately, rolls back on error).
 - [x] Food search against the `foods` table — debounced `ilike` query using
       the trigram index, verified returning real matches (see BUILD_LOG).
-- [x] Seed `foods` from USDA FoodData Central — 7,793 SR Legacy foods loaded
-      2026-08-22 by `scripts/seed_foods_usda.py` once the service_role key
-      landed, with the 800 hand-loaded test rows cleared first. Verified
-      against the database; security advisor clean afterward.
+- [x] Seed `foods` from USDA FoodData Central — two sources, two seeders,
+      each idempotent on its own `source` value so they never clobber each
+      other:
+      - `source='usda'` — 7,793 SR Legacy whole foods, loaded 2026-08-22 by
+        `scripts/seed_foods_usda.py`.
+      - `source='usda_branded'` — ~399k packaged products, loaded 2026-08-23 by
+        `scripts/stage_branded.py` + `scripts/seed_foods_branded.py`. The full
+        2.0M-product dataset doesn't fit the free tier; this is every
+        *distinct* product after deduping on (brand, name) and on barcode,
+        with implausible and all-zero rows dropped. Danny's call was to stay
+        on the free tier.
 - [x] Week view and streaks — bottom tabs (Today/Week), 7-day bar chart with
       goal line ported from the prototype, tap a day to see its entries, plus
       a simple "days logged in a row" streak (no prototype precedent for

@@ -84,7 +84,14 @@ create table public.foods (
   source text not null default 'usda',
   created_at timestamptz not null default now()
 );
-create index foods_name_trgm_idx on public.foods using gin (name extensions.gin_trgm_ops);
+-- Name and brand together, because branded USDA rows keep the brand out of the
+-- name: a Quest bar is name "PROTEIN BAR, COOKIES & CREAM" + brand "QUEST BAR",
+-- so a name-only search finds nothing for "quest protein bar".
+alter table public.foods
+  add column search_text text
+  generated always as (name || ' ' || coalesce(brand, '')) stored;
+create index foods_search_trgm_idx
+  on public.foods using gin (search_text extensions.gin_trgm_ops);
 
 -- The moat: what each person's own words resolve to.
 create table public.personal_foods (
@@ -190,6 +197,44 @@ create policy "own weights" on public.weights
   for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own suggestion feedback" on public.suggestion_feedback
   for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ---------- ranked food search ----------
+-- Ranking lives here, not in the client. With ~407k rows an alphabetical
+-- "order by name limit 20" buries the row you asked for under whichever brand
+-- happens to sort first. Matches every word in any order (people type
+-- "quest protein bar", the row is "PROTEIN BAR" / brand "QUEST BAR"), then
+-- ranks: exact name, prefix, whole foods over packaged, shortest first.
+-- security invoker, so the caller's RLS on public.foods still applies.
+create or replace function public.search_foods(q text, lim int default 20)
+returns setof public.foods
+language sql
+stable
+set search_path = public, extensions
+as $$
+  with parsed as (
+    select btrim(lower(q)) as needle,
+           (array_remove(string_to_array(btrim(lower(q)), ' '), ''))[1] as first_word,
+           array(select '%' || w || '%'
+                 from unnest(string_to_array(btrim(lower(q)), ' ')) as w
+                 where w <> '') as pats
+  )
+  select f.*
+  from public.foods f, parsed p
+  where length(p.needle) >= 2
+    and f.search_text ilike '%' || p.first_word || '%'
+    and f.search_text ilike all (p.pats)
+  order by
+    (lower(f.name) = p.needle) desc,
+    (lower(f.name) like p.needle || '%') desc,
+    (f.source = 'usda') desc,
+    length(f.search_text) asc,
+    f.name asc
+  limit greatest(1, least(lim, 50));
+$$;
+
+revoke all on function public.search_foods(text, int) from public;
+revoke all on function public.search_foods(text, int) from anon;
+grant execute on function public.search_foods(text, int) to authenticated;
 
 -- Shared food table: anyone signed in can read, nobody writes from a client.
 create policy "read foods" on public.foods

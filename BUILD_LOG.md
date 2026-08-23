@@ -5,6 +5,89 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-08-23 (later) — 407k foods loaded, and the search that made them findable
+
+Danny asked to load "all of the food data ... since I added the api key". Two
+things worth recording about that framing: the key he meant was the
+service_role key from 08-22, and **it had already done its job** — the 7,793 SR
+Legacy whole foods went in that day. The actual gap was *branded* food.
+"Quest protein bar" and "starbucks" both returned zero.
+
+- **Sized it before loading anything.** Full USDA Branded is 1,981,655 products
+  (440MB zipped, ~3GB of CSV). Measured against this schema that projected well
+  past the free tier's 500MB, so Danny picked "curated subset, stay free" over
+  a $25/mo Pro upgrade or a live-API-lookup architecture.
+- **Then measured instead of trusting the projection, which changed the
+  answer.** A 20k sample load came out at **358 bytes/row**, not the ~1,200 I'd
+  estimated — branded names average 40 chars against SR Legacy's long
+  descriptive ones, and the trigram index scales with name length. That put the
+  *entire* deduplicated catalog inside the free tier, so there was no need to
+  cap anything. Loaded all of it: **399,293 branded + 7,793 whole = 407,086
+  foods, 165MB, 33% of the free tier, 335MB headroom.** Final size landed within
+  1% of the projection from the sample.
+- **What got dropped, and why.** From 1.98M down to 399k: US-only and not
+  discontinued; all four macros present; calories physically possible
+  (0–900/100g); deduped on (brand, name) keeping the most recent; deduped on
+  barcode, because `foods.barcode` is UNIQUE and USDA records the same physical
+  product repeatedly under different descriptions (this alone halved 796k→399k).
+  Also dropped rows where all four macros are zero — that costs us genuinely
+  zero-calorie condiments, a real loss, but USDA also records bottled Coca-Cola
+  as 0 cal, and **a wrong zero is worse than a missing row**: a gap makes you
+  search again, a false zero silently under-counts the day.
+- **Two new scripts**, both stdlib, both idempotent:
+  `scripts/stage_branded.py` streams the three CSVs straight out of the zip into
+  a local SQLite file (never extracting 3GB), and `scripts/seed_foods_branded.py`
+  picks the set with SQL and bulk-loads it. Separate `source='usda_branded'`
+  means the two seeders can't clobber each other — each only clears its own
+  source. Re-running the selection is seconds instead of an hour.
+- **Loading the data exposed that search was about to get much worse, and
+  fixing it was most of the work.** Three real bugs, each found by testing
+  actual queries rather than assuming:
+  1. `order by name limit 20` over 407k rows returns whichever brand sorts
+     first, not the food you asked for. Moved ranking into a `search_foods`
+     database function: exact name, then prefix, then whole foods ahead of
+     packaged, then shortest name.
+  2. `ilike '%whole phrase%'` needs the words adjacent, so "quest protein bar"
+     matched **nothing** while "QUEST BAR / PROTEIN BAR" sat right there. Now
+     every word must appear, in any order, with the first word kept as a plain
+     ilike so the planner still drives the GIN index off it.
+  3. The real one: SR Legacy bakes the brand into the name
+     ("Yogurt, Greek, plain, CHOBANI") but branded data does **not** — a Quest
+     bar is name "PROTEIN BAR, COOKIES & CREAM", brand "QUEST BAR". Name-only
+     search could never find it. Added a stored generated column
+     `search_text = name || ' ' || brand` with its own trigram index, replacing
+     the name-only index rather than adding to it (net ~+28MB).
+  I nearly mis-diagnosed #3 as "Quest isn't in the dataset" — a `limit 6`
+  without an `order by` showed me "Buck Quest" and "CHEF'S REQUESTED" and I
+  took it as absence. It wasn't; ~230 Quest products were loaded the whole time.
+  **Don't read an unordered LIMIT as evidence of absence.**
+- **Verified**: every previously-failing query now returns the right thing —
+  "quest protein bar" → Quest bars, "great value peanut butter" → Great Value
+  peanut butter, "starbucks latte" → Starbucks lattes, "chicken breast" →
+  chicken breast. Ranked search runs 10.7ms typical; worst case is a broad
+  single word like "chicken" (~10k matches, all sorted) at 147ms, which is fine
+  behind the client's 300ms debounce but is the thing to optimise if search ever
+  feels slow. RLS holds: `authenticated` can call `search_foods`, `anon` gets
+  "permission denied for function". Security advisor clean.
+- Also fixed the UTF-16 `.env.local` crash that QUESTIONS.md had queued — both
+  seeders now sniff the BOM instead of dying with a `UnicodeDecodeError` that
+  looks exactly like a missing key.
+- **Not verified**: the client's `supabase.rpc('search_foods', ...)` call itself,
+  same session blocker as the earlier entry. The function is proven from SQL;
+  the round trip through PostgREST is not.
+- Deliberately **not** changed: values stay per-100g with `serving_label
+  "100 g"`, matching the SR Legacy convention. Real per-serving figures ("1 bar
+  (60g)") are staged in the SQLite file and would be more useful, but switching
+  has to happen for *both* sources at once — mixing per-serving and per-100g
+  rows behind one column would show wrong numbers, which is the one thing a
+  calorie tracker cannot do. Queued as a follow-up.
+
+**Next run:** unchanged from below — the redirect URLs are still the top
+blocker, and now they also gate seeing this search working in the actual app.
+Phase 3 remains the next unblocked build work.
+
+---
+
 ## 2026-08-23 — Water tracking; Phase 2's task list is done; a real auth blocker found
 
 First interactive session in a while, so the thing the last two runs kept
