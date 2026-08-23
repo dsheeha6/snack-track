@@ -27,6 +27,9 @@ create table public.profiles (
   target_protein int not null default 165,
   target_carbs int not null default 220,
   target_fat int not null default 70,
+  -- Flat default rather than computed from bodyweight — the formulas disagree
+  -- with each other and it isn't worth a settings argument.
+  target_water_oz numeric(6,1) not null default 64,
   hide_calorie_numbers boolean not null default false,
   food_preferences jsonb not null default '{}'::jsonb,
   onboarded_at timestamptz,
@@ -144,6 +147,21 @@ create table public.ai_usage (
 );
 create index ai_usage_user_idx on public.ai_usage (user_id, created_at desc);
 
+-- ---------- water ----------
+-- Hydration tracking, deliberately separate from `entries`: water is a
+-- consistency feature, not a calorie one, so it never touches calorie or macro
+-- totals and never shows up as a row in a meal section. Calorie-bearing drinks
+-- (coffee with milk, beer) go through `entries` like any other food.
+-- See QUESTIONS.md, "Drinks tracking — answered 2026-08-22".
+create table public.water_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  logged_on date not null default current_date,
+  ounces numeric(6,1) not null check (ounces > 0),
+  created_at timestamptz not null default now()
+);
+create index water_log_user_date_idx on public.water_log (user_id, logged_on desc);
+
 -- ---------- row level security ----------
 -- Every table is locked down. A signed-in user reaches their own rows and
 -- nothing else. Verify with a second test account before trusting it.
@@ -156,6 +174,7 @@ alter table public.weights enable row level security;
 alter table public.suggestion_feedback enable row level security;
 alter table public.subscriptions enable row level security;
 alter table public.ai_usage enable row level security;
+alter table public.water_log enable row level security;
 
 create policy "own profile" on public.profiles
   for all to authenticated using (auth.uid() = id) with check (auth.uid() = id);
@@ -164,6 +183,8 @@ create policy "own targets" on public.target_history
 create policy "own entries" on public.entries
   for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own personal foods" on public.personal_foods
+  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own water log" on public.water_log
   for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own weights" on public.weights
   for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);

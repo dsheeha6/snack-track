@@ -8,8 +8,45 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
-Nothing is fully blocked — both items below are things only you can do, not
-decisions that hold anything up.
+### Add the app's redirect URLs in Supabase — 2 minutes, and it's blocking the phone test
+**This is now the top item.** On 2026-08-23 I stopped guessing and tested it: I
+asked Supabase's admin API for a sign-in link with five different redirect URLs
+and checked which ones came back intact. Only one does.
+
+| redirect the app asks for | what Supabase actually returns |
+|---|---|
+| `http://localhost:8081/auth-callback` (web) | ❌ replaced with `localhost:3000` |
+| `snacktrack://auth-callback` (the installed app) | ❌ replaced with `localhost:3000` |
+| `exp://…/--/auth-callback` (Expo Go) | ❌ replaced with `localhost:3000` |
+| `http://localhost:3000` (untouched default) | ✅ kept |
+
+Supabase does **not** error on a redirect URL that isn't allowlisted — it
+silently swaps in the Site URL. That's why this slipped through when sign-in was
+called "verified end to end": the session was real, the redirect was not. So
+when you tap the magic link on your phone, it will send you to
+`http://localhost:3000`, which is nothing, and you'll never land back in the app.
+
+**Fix:** open
+https://supabase.com/dashboard/project/grltvenoqmzhgkfasvlb/auth/url-configuration
+and add these four under **Redirect URLs**:
+
+```
+snacktrack://**
+exp://**
+http://localhost:8081/**
+http://localhost:19006/**
+```
+
+(The `**` wildcards matter — Expo Go's URL contains your laptop's LAN IP and
+port, which change between networks. `19006` is Expo's web port when 8081 is
+busy.) Leave Site URL alone; it's only the fallback.
+
+I can't do this one — it's a dashboard auth setting, and neither the Supabase MCP
+tools nor the service_role key can reach it. Once it's in, tell me and I'll sign
+in and finally check the Today and Week screens with real data, which is the last
+unverified piece of Phase 2.
+
+**Danny:**
 
 ### Try the app on your phone
 Phase 1's real app exists now (`mobile/`) and everything I can verify without a
@@ -54,11 +91,12 @@ Whichever route, the check is the same: sign in with email, tap the link when it
 lands, confirm you land on a "Today" screen showing calories and macro targets
 (2200 / 165P / 220C / 70F — the schema defaults, real numbers from your database).
 
-If the magic-link tap doesn't redirect back into the app, it's almost certainly
-because Supabase's Auth → URL Configuration → Redirect URLs allowlist doesn't
-include the Expo Go redirect for your network. Reply here with what you saw and
-I'll adjust the redirect handling or walk you through adding the URL — I can't
-change that dashboard setting myself with the tools I have.
+**Do the redirect-URL item above first.** That paragraph used to be a guess
+("if the tap doesn't redirect back, it's *probably* the allowlist"). As of
+2026-08-23 it's confirmed: the allowlist is at its default and every redirect
+this app uses gets silently swapped for `localhost:3000`. The magic-link tap
+*will* dead-end until those four URLs are added. Everything else about the phone
+routes below is unchanged.
 
 **Danny:**
 
@@ -103,7 +141,15 @@ covers testing before that. Say the word when you want to enroll.
 
 ## ANSWERED
 
-### Drinks tracking — answered 2026-08-22
+### Drinks tracking — answered 2026-08-22, built 2026-08-23
+**Built exactly as specced below**, including every one of the "defaults to
+assume" — 8 oz per tap, 64 oz default goal (editable, not computed from
+bodyweight), caloric drinks excluded from the water total, and a `water_log`
+table with RLS matching `entries` (verified with impersonated JWTs; security
+advisor clean). The one addition beyond the spec: the daily goal is editable
+from the widget's `custom` sheet, because Phase 3's settings screen doesn't
+exist yet and "editable" needed somewhere to live. Details in BUILD_LOG.
+
 Danny's call, in his words and then what it means to build:
 
 **Water is tracked, and it's a hydration feature, not a calorie feature.** One

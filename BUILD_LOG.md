@@ -5,6 +5,83 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-08-23 — Water tracking; Phase 2's task list is done; a real auth blocker found
+
+First interactive session in a while, so the thing the last two runs kept
+deferring — actually looking at the UI — finally happened, and a blocker that
+had only been a guess got confirmed as real.
+
+- **The magic-link redirect allowlist is genuinely broken, and it's the reason
+  the phone test will fail.** Probed the Supabase auth config directly by asking
+  `admin/generate_link` for five different `redirect_to` values and seeing which
+  came back intact. Only `http://localhost:3000` — the untouched default Site
+  URL — survives. `http://localhost:8081/auth-callback` (what
+  `Linking.createURL()` produces on web), `snacktrack://auth-callback` (the
+  native scheme from `app.json`), and the `exp://…` form Expo Go uses were all
+  **silently replaced** with `localhost:3000`. Supabase doesn't error on an
+  unlisted redirect, it just swaps it, which is exactly why this went unnoticed
+  while sign-in was called "verified end to end". Queued in QUESTIONS.md with
+  the precise URLs to paste — it's a dashboard setting, not something the MCP
+  or the service_role key can reach.
+- **Water tracking built, closing the last open Phase 2 task.** Built to
+  Danny's 2026-08-22 answer exactly: hydration, not calories.
+  - Migration `add_water_log`: `water_log` (user_id, logged_on, ounces,
+    `check (ounces > 0)`), a `(user_id, logged_on desc)` index, RLS matching
+    `entries`, plus `profiles.target_water_oz numeric default 64`.
+  - `lib/water.ts` — fetch/add/delete/sum plus `updateWaterTarget`. `user_id` is
+    stamped inside `addWater()` from `getUser()` rather than trusted from the
+    call site, the same trap `addEntry()` hit back on 08-21.
+  - `components/water-card.tsx` — blue so it reads as its own thing beside the
+    macro card. One big `+ 8 oz` button, a `custom` sheet for an arbitrary
+    amount *and* the editable daily goal (Phase 3 has no settings screen yet, so
+    the goal lives here for now), and `undo` when there's something to undo.
+  - Wired into `TodayScreen` between the macro card and the meal sections.
+    Adds are optimistic like `handleDelete`. `handleUndoWater` deliberately
+    no-ops on a still-pending row: deleting by a `pending-` id would 404 and
+    roll back a tap that actually did save.
+- **RLS verified before building on it, not after.** Ran the real insert/select
+  shapes inside a rolled-back transaction with impersonated JWTs: the owner saw
+  their 2 rows / 20 oz, a second user querying explicitly by the owner's
+  `user_id` got 0, `anon` got 0, and an attempt to insert a row owned by someone
+  else was rejected by the `with check` clause. Confirmed 0 rows left behind
+  afterward. Security advisor after the migration: clean, only the pre-existing
+  `auth_leaked_password_protection` warning, which doesn't apply to a
+  passwordless app.
+- **The UI was actually looked at this time** — partly. `TodayScreen` needs a
+  session and minting one was blocked by the harness (reasonably — the script
+  handled auth tokens), and with the redirect allowlist broken there was no
+  clean way in. So `WaterCard` was rendered on a temporary `_dev-water` route
+  with local state and driven for real: `+ 8 oz` moved 24 → 32 with the copy
+  following, the fill bar sat at 50% and clamped to 100% past goal instead of
+  overflowing, a custom 20 oz add landed, changing the goal to 100 recomputed
+  "8 oz to go", and the bar **stayed blue past the goal** with "Goal reached —
+  nice." — no red, no scold, per PRODUCT.md. Route deleted afterward; it is not
+  in the commit.
+- **A scare that turned out to be the harness, not the app**: the sheet appeared
+  not to close — Close, Add and Save all left it on screen. The React tree said
+  otherwise (`sheetOpen=false`, `visible=false` all the way down), and
+  `document.hidden` was `true` with the slide-out animation stuck at
+  `currentTime: 0`. The Browser pane isn't displayed in this session, so the page
+  composites no frames, so the CSS animation never ends, so React Native Web's
+  `Modal` never reaches the `animationend` that unmounts it. Not a bug. Worth
+  remembering before chasing the next one: **a hidden pane can't finish an
+  animation, so anything that unmounts on animation end will look stuck.**
+- Still **not** eyeballed by anyone: the tab bar, the Week screen, and the day
+  view with real entries in it. Those need a session, which needs the redirect
+  fix.
+- `tsc --noEmit` clean; `expo export --platform web` bundles clean (1.5MB).
+
+**Next run:** if Danny's added the redirect URLs, sign in normally and finally
+look at Today + Week with real data — that's the last unverified thing in
+Phase 2, and Phase 1's "done when" depends on the same fix. If the phone test
+passed too, both phases close. Otherwise Phase 3 is the next unblocked work and
+needs nothing from him: Mifflin-St Jeor + activity math, the onboarding screens,
+`target_history` writes, and the safety floor. Note the goal-based nutrient
+phase (sugar + fiber) sitting in QUESTIONS.md — it is **not** part of Phase 3
+and shouldn't be folded into it.
+
+---
+
 ## 2026-08-22 — Phase 2: tab navigation, Week view, a first take on streaks
 
 Both QUESTIONS.md items are still unanswered — checked `.env.local` directly

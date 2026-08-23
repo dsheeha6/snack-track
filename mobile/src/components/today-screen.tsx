@@ -7,17 +7,28 @@ import { EntryRow } from '@/components/entry-row';
 import { MacroBar } from '@/components/macro-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { WaterCard } from '@/components/water-card';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
 import { addEntry, deleteEntry, fetchEntries, type Entry, type NewEntry } from '@/lib/entries';
 import { guessMealSlot, localDateString, MEAL_COLORS, MEAL_LABELS, MEAL_SLOTS, type MealSlot } from '@/lib/meals';
 import { supabase } from '@/lib/supabase';
+import {
+  addWater,
+  deleteWater,
+  DEFAULT_TARGET_OUNCES,
+  fetchWater,
+  sumOunces,
+  updateWaterTarget,
+  type WaterEntry,
+} from '@/lib/water';
 
 type Profile = {
   target_calories: number;
   target_protein: number;
   target_carbs: number;
   target_fat: number;
+  target_water_oz: number;
 };
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number };
@@ -40,6 +51,7 @@ export function TodayScreen() {
   const { session, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [water, setWater] = useState<WaterEntry[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [modalMeal, setModalMeal] = useState<MealSlot | null>(null);
 
@@ -51,11 +63,17 @@ export function TodayScreen() {
       .catch((e) => setLoadError(e instanceof Error ? e.message : 'Could not load today.'));
   }, [eatenOn]);
 
+  const loadWater = useCallback(() => {
+    fetchWater(eatenOn)
+      .then(setWater)
+      .catch((e) => setLoadError(e instanceof Error ? e.message : 'Could not load your water.'));
+  }, [eatenOn]);
+
   useEffect(() => {
     let cancelled = false;
     supabase
       .from('profiles')
-      .select('target_calories, target_protein, target_carbs, target_fat')
+      .select('target_calories, target_protein, target_carbs, target_fat, target_water_oz')
       .single()
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -69,9 +87,12 @@ export function TodayScreen() {
 
   useEffect(() => {
     loadEntries();
-  }, [loadEntries]);
+    loadWater();
+  }, [loadEntries, loadWater]);
 
   const totals = sumEntries(entries);
+  const waterOunces = sumOunces(water);
+  const waterTarget = Number(profile?.target_water_oz ?? DEFAULT_TARGET_OUNCES);
 
   const handleSave = async (entry: NewEntry) => {
     const saved = await addEntry(entry);
@@ -87,6 +108,51 @@ export function TodayScreen() {
     } catch (e) {
       setEntries(previous);
       setLoadError(e instanceof Error ? e.message : 'Could not delete that entry.');
+    }
+  };
+
+  // Optimistic, like handleDelete: a water tap should feel instant, and the
+  // row it writes is trivial to roll back if the insert fails.
+  const handleAddWater = async (ounces: number) => {
+    const pending: WaterEntry = {
+      id: `pending-${Date.now()}`,
+      logged_on: eatenOn,
+      ounces,
+      created_at: new Date().toISOString(),
+    };
+    setWater((prev) => [...prev, pending]);
+    try {
+      const saved = await addWater(eatenOn, ounces);
+      setWater((prev) => prev.map((w) => (w.id === pending.id ? saved : w)));
+    } catch (e) {
+      setWater((prev) => prev.filter((w) => w.id !== pending.id));
+      setLoadError(e instanceof Error ? e.message : 'Could not save that water.');
+    }
+  };
+
+  const handleUndoWater = async () => {
+    const last = water[water.length - 1];
+    // Nothing to undo, or the last tap hasn't come back from the insert yet —
+    // deleting by a pending id would 404 and roll back a tap that did save.
+    if (!last || last.id.startsWith('pending-')) return;
+    const previous = water;
+    setWater((prev) => prev.filter((w) => w.id !== last.id));
+    try {
+      await deleteWater(last.id);
+    } catch (e) {
+      setWater(previous);
+      setLoadError(e instanceof Error ? e.message : 'Could not undo that.');
+    }
+  };
+
+  const handleWaterTarget = async (ounces: number) => {
+    const previous = profile;
+    setProfile((p) => (p ? { ...p, target_water_oz: ounces } : p));
+    try {
+      await updateWaterTarget(ounces);
+    } catch (e) {
+      setProfile(previous);
+      setLoadError(e instanceof Error ? e.message : 'Could not save your water goal.');
     }
   };
 
@@ -123,6 +189,14 @@ export function TodayScreen() {
                 />
                 <MacroBar label="fat" current={totals.fat} target={profile.target_fat} unit="g" color={Brand.teal} />
               </ThemedView>
+
+              <WaterCard
+                ounces={waterOunces}
+                target={waterTarget}
+                onAdd={handleAddWater}
+                onUndo={water.length > 0 ? handleUndoWater : undefined}
+                onChangeTarget={handleWaterTarget}
+              />
 
               {MEAL_SLOTS.map((slot) => {
                 const mealEntries = entries.filter((e) => e.meal === slot);

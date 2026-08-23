@@ -4,7 +4,9 @@ One phase at a time, in order. Each phase has a goal, a short task list, and a
 **done when** line. Nothing moves to the next phase until the current one's
 "done when" is genuinely true and verified by running it.
 
-**CURRENT PHASE: 1 — Foundation**
+**CURRENT PHASE: 2 — Core tracker** — every task in it is now built. The two
+"done when" checks that remain are Danny's: opening it on a phone (Phase 1) and
+using it for a real day instead of the prototype (Phase 2).
 
 **Read `PRODUCT.md` before any decision about features, copy, or design.** The app
 is simple, easy, and doesn't judge anyone. That's the differentiator, not a slogan —
@@ -65,15 +67,20 @@ lands on an empty day view backed by the real database.
       is optimistic (removes from the list immediately, rolls back on error).
 - [x] Food search against the `foods` table — debounced `ilike` query using
       the trigram index, verified returning real matches (see BUILD_LOG).
-- [ ] Seed `foods` from USDA FoodData Central — started early, off-phase (see
-      below), 800/~7,800 SR Legacy foods loaded, blocked on Danny for the rest
+- [x] Seed `foods` from USDA FoodData Central — 7,793 SR Legacy foods loaded
+      2026-08-22 by `scripts/seed_foods_usda.py` once the service_role key
+      landed, with the 800 hand-loaded test rows cleared first. Verified
+      against the database; security advisor clean afterward.
 - [x] Week view and streaks — bottom tabs (Today/Week), 7-day bar chart with
       goal line ported from the prototype, tap a day to see its entries, plus
       a simple "days logged in a row" streak (no prototype precedent for
       streaks specifically, so this is a first design — see BUILD_LOG)
-- [ ] Drinks: water, coffee, alcohol — no schema or prototype precedent yet;
-      needs a product decision on whether water/coffee count toward calories
-      before building
+- [x] Drinks — answered by Danny 2026-08-22 and built to that answer. Water is
+      a *hydration* feature, not a calorie one: its own `water_log` table and a
+      blue ounces widget on the day view, one tap = 8 oz, editable daily goal
+      (default 64 oz). It never touches calorie/macro totals and never appears
+      as a row in a meal section. Calorie-bearing drinks, alcohol included, go
+      through the normal food flow with no special casing.
 
 **Done when:** Danny can stop using the localhost prototype for a full day without
 missing anything.
