@@ -134,9 +134,15 @@ missing anything.
 **Goal:** a stranger can install it and get correct targets without help.
 
 - [ ] The seven onboarding screens, plus the optional food-preferences screen
-- [ ] Mifflin-St Jeor + activity math, with the arithmetic shown to the user
+- [ ] Mifflin-St Jeor + activity math, with the arithmetic shown to the user.
+      **The math itself is built and verified** (`mobile/src/lib/targets.ts`,
+      2026-08-24) — no onboarding UI calls it yet. See BUILD_LOG for the exact
+      verification against Danny's known real numbers.
 - [ ] Editable targets, written to `target_history`
-- [ ] The safety floor: warn under ~1,200 cal, no goal weight below a healthy BMI
+- [ ] The safety floor: warn under ~1,200 cal (built into `calcTargets()` as
+      `floorWarning`, verified). No-goal-weight-below-healthy-BMI still
+      unbuilt — there's no goal-weight field on `profiles` yet; that's an
+      onboarding-screen decision, not a math one.
 
 **Done when:** a fresh account reaches a personalised target screen and the numbers
 match the plan's worked example for Danny's own stats.

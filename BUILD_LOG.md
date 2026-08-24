@@ -5,6 +5,80 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-08-24 — Phase 3 started: the target-math module, checked against Danny's real numbers
+
+Unattended scheduled run. Checked QUESTIONS.md first — every OPEN item still has
+an empty `**Danny:**` line, nothing to act on. All of Phase 1/2's remaining work
+(phone test, the sign-in root-cause answer, redirect URLs, social sign-in) is
+still his. Phase 3 is the next unblocked build work, per every prior entry's
+"Next run" note, and the full phase (seven onboarding screens, target math,
+editable targets, the safety floor) is too big for one session — picked the
+piece that stands alone and is checkable without any UI: the calorie/macro
+math itself.
+
+- **Built `mobile/src/lib/targets.ts`**: Mifflin-St Jeor BMR, an activity tier
+  (steps + lifting days + cardio minutes → one of the standard 1.2-1.9 PAL
+  multipliers), a goal-based calorie adjustment (cut -500 / recomp -250 /
+  bulk +300 / track +0 — standard sports-nutrition ranges, not tuned to
+  anyone), a macro split anchored to bodyweight (1 g protein/lb, 0.45 g
+  fat/lb, both rounded to the nearest 5g, carbs fill the rest), and the
+  ~1,200-calorie floor warning PRODUCT.md requires, worded plainly rather than
+  as a scold. Pure functions, no React Native imports, so it types and runs on
+  its own.
+- **Verified against a real worked example, not just types.** Danny's own
+  stats are already on record: `../calorie-tracker/data/log.json` has his
+  actual targets (2900 cal / 180P / 365C / 80F) and
+  `memory/danny-fitness-profile.md` has the inputs (23M, 5'10", 179 lb, ~10k
+  steps/day, 4 lifting days/week, 12 mi/week running) and the BMR that was
+  computed for him at the time (1,813). Ran the new module against those exact
+  inputs (`node`'s built-in TS stripping, no new dependency installed):
+  - **BMR: 1,813.18 → rounds to 1,813.** Exact match to the number on record.
+  - **Protein 180g, fat 80g — exact match.** The bodyweight-anchored split
+    (179 lb × 1.0 → round5 → 180; 179 × 0.45 → round5 → 80) reproduces his
+    real macros precisely.
+  - **Calories: 2,878 vs. the real 2,900 — 22 kcal off (0.8%).** Activity
+    tiered as "very active" (his steps/lifting/cardio put him at 5.9 of the
+    tier scale's 7-point "very" cutoff), giving TDEE 3,128; the -250 recomp
+    adjustment lands at 2,878. **Carbs came out 360g vs. the real 365g** —
+    entirely downstream of that same 22-calorie gap (22/4 ≈ 5g), not a
+    separate error; the fill-the-rest formula is correct given its calorie
+    input.
+  - This is expected, not a bug to chase: the real 2,900 was never derived
+    from a documented formula (no activity-multiplier or goal-delta logic
+    exists anywhere in the repo or the plan doc), so there was nothing to
+    reverse-engineer exactly. What matters is that the pieces that **are**
+    fully specified (the Mifflin-St Jeor constant, the bodyweight macro
+    split) reproduce his real numbers exactly, and the one piece that had to
+    be designed from scratch (activity tier → TDEE → goal delta) lands within
+    1% using standard, explainable constants rather than anything hand-fit to
+    this one data point. Flagging rather than claiming an exact match the
+    module doesn't actually produce.
+  - Also checked: `ageYearsFromBirthDate()` against a same-year and
+    not-yet-had-birthday date (both correct), and the floor warning fires
+    with plain, non-alarming copy for a case built to trip it (110 lb,
+    sedentary, cutting → 956 cal).
+  - `tsc --noEmit` clean.
+- **Not built this run**: the seven onboarding screens themselves, wiring this
+  module into a screen that "shows the arithmetic," writes to
+  `target_history`, or the goal-weight/BMI half of the safety floor (there's
+  no goal-weight field on `profiles` yet — that's an onboarding-screen
+  decision about what to ask, not something this module needed to guess at).
+  ROADMAP.md's Phase 3 box for this item stays unchecked; only the module
+  itself is done and verified.
+
+**Next run:** check QUESTIONS.md first, as always. If still nothing's
+answered, build the onboarding screens on top of `targets.ts` — screens 1-5
+collect the inputs the module already takes (sex/age, height/weight, steps,
+training, goal), screen 6 renders `calcTargets()`'s output with the BMR →
+activity → goal arithmetic laid out line by line (the module's return shape
+already separates `bmr`/`tdee`/`goalAdjustment`/`calories` for exactly this),
+and screen 7 is the first natural-language log — which is Phase 4 work, so
+stub it as a manual entry for now rather than pulling AI logging in early.
+`target_history` writes and the goal-weight safety floor can follow once
+there's a screen that asks for a goal weight at all.
+
+---
+
 ## 2026-08-23 (later still) — one sign-in bug fixed, the other closed off from two directions
 
 Unattended scheduled run. Picked up exactly where the last entry said to:
