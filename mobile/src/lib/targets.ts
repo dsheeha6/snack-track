@@ -41,7 +41,7 @@ export interface TargetResult {
 }
 
 const LB_PER_KG = 2.20462;
-const CALORIE_FLOOR = 1200; // PRODUCT.md: "Warn under ~1,200 calories."
+export const CALORIE_FLOOR = 1200; // PRODUCT.md: "Warn under ~1,200 calories."
 
 const ACTIVITY_MULTIPLIERS: Record<ActivityTier, number> = {
   sedentary: 1.2,

@@ -23,6 +23,9 @@ create table public.profiles (
   lifting_days_per_week int,
   cardio_minutes_per_week int,
   goal goal_type not null default 'recomp',
+  -- Only asked when the goal is cut or bulk, and skippable even then. The
+  -- healthy-BMI floor is enforced in the app before this is ever written.
+  goal_weight_lb numeric(6,2),
   target_calories int not null default 2200,
   target_protein int not null default 165,
   target_carbs int not null default 220,

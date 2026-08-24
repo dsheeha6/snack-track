@@ -8,180 +8,6 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
-### 🐞 Sign-in bugs Danny hit 2026-08-23 — one fixed, one needs your answer
-
-#### 2. "Wait 19 seconds" reads like a failure — FIXED 2026-08-23
-Built exactly as specced: the "Send me a code" button and the "Resend code"
-link both disable for 60s after a send and show a live countdown ("Resend in
-43s") instead of staying enabled and erroring. If a 429 gets through anyway
-(e.g. the local timer was lost on a reload), the app now parses the wait out
-of Supabase's message and shows "One code a minute. Try again in Ns." instead
-of the raw wording. `tsc --noEmit` and `expo export --platform web` both
-clean. **Not eyeballed** — this is an unattended run and the harness won't
-start a dev server without someone present, so the countdown ticking down and
-the button re-enabling at zero have not been watched happen, only traced
-through the code. Worth a look next time someone's driving the app by hand.
-
-#### 1. Signed in without entering the code — CAUSE NARROWED, NEEDS ONE ANSWER
-**Two defensive fixes went in regardless of your answer, since they cost
-little either way** (see BUILD_LOG for the full reasoning):
-- `signOut()` now uses Supabase's global scope explicitly, which revokes the
-  session everywhere, not just in the tab that clicked it — so a stale tab
-  can no longer keep working, or refresh a token and hand it back to this one.
-- The sign-in screen is now authoritative: if a session shows up in a tab
-  that never asked for one (no code just verified, no password just
-  submitted, no magic-link/OAuth redirect just handled) while that tab
-  believes it's signed out, it's treated as stale litter and signed out again
-  immediately rather than accepted. A normal app reopen restoring your last
-  real session is unaffected — only sessions that arrive *while already on
-  the sign-in screen* get this scrutiny.
-
-These two together should make the bug you hit structurally impossible going
-forward, regardless of which of the two causes below it turns out to have
-been. But the causal question below is still open and still worth answering,
-because it tells us whether there's a *third* thing to find.
-Danny: *"i can click the login with email and get the code but then when i got
-back i was logged in before i put in the code."*
-
-What `auth_logs` actually shows around it:
-
-| time | event |
-|---|---|
-| 03:29:01 | `Login`, `login_method: otp` — the agent's test sign-in |
-| 03:34:46 | `/logout` 204 — Danny signs out |
-| 03:35:00 | `/otp` 200 — Danny requests a code |
-| 03:35:40 | `/otp` 429 — "only request this after 19 seconds" |
-
-**There is no `Login` event and no successful `/verify` after 03:29:01.** That
-rules out the intuitive explanation — he did *not* get signed in by tapping the
-"Sign in" link still present in the email template, because that path always
-writes a `/verify` + `Login` pair and neither exists.
-
-So no new authentication happened. The app restored a session that was already
-in the browser. Leading theory: **the agent left a signed-in preview tab open on
-`localhost:8081`.** supabase-js refreshes its token on a timer and persists to
-`localStorage`, which tabs share, so that tab could rewrite the session moments
-after Danny's `signOut()` cleared it — and his tab reads it back on focus.
-
-**Danny — one question, this decides whether it's a real bug or agent litter:**
-were you in the same browser where the agent's preview tab was open, and was
-that tab still open? If yes, it's almost certainly the stale-tab artifact. If
-no — you used a different browser or a fresh window — then it's a genuine
-session-restore bug and worth digging into further even though the two fixes
-above should already prevent it from recurring.
-
-**Still queued, not done (a Supabase dashboard setting, not code):** consider
-dropping `{{ .ConfirmationURL }}` from the Magic Link template entirely. The
-app asks for a code now; leaving a live one-tap link in the same email is a
-second, untested way in that nobody needs, and it muddies exactly this kind
-of diagnosis.
-
-**Danny:**
-
-### Add the app's redirect URLs in Supabase — still needed, but no longer the top blocker
-**Downgraded 2026-08-23, and that still stands.** The code flow is now the
-default sign-in and needs no redirect at all — it's been proven working end to
-end, so nothing is blocked on this. Redirect URLs are still required for three
-things: the email+password signup confirmation link, Google and Apple sign-in
-when those land, and any magic link already sitting in an inbox.
-
-(The paragraph below was written when magic links *were* the only way in and
-called this the top item. Keeping the evidence, dropping the urgency.)
-
-On 2026-08-23 I stopped guessing and tested it: I
-asked Supabase's admin API for a sign-in link with five different redirect URLs
-and checked which ones came back intact. Only one does.
-
-| redirect the app asks for | what Supabase actually returns |
-|---|---|
-| `http://localhost:8081/auth-callback` (web) | ❌ replaced with `localhost:3000` |
-| `snacktrack://auth-callback` (the installed app) | ❌ replaced with `localhost:3000` |
-| `exp://…/--/auth-callback` (Expo Go) | ❌ replaced with `localhost:3000` |
-| `http://localhost:3000` (untouched default) | ✅ kept |
-
-Supabase does **not** error on a redirect URL that isn't allowlisted — it
-silently swaps in the Site URL. That's why this slipped through when sign-in was
-called "verified end to end": the session was real, the redirect was not. So
-when you tap the magic link on your phone, it will send you to
-`http://localhost:3000`, which is nothing, and you'll never land back in the app.
-
-**Fix:** open
-https://supabase.com/dashboard/project/grltvenoqmzhgkfasvlb/auth/url-configuration
-and add these four under **Redirect URLs**:
-
-```
-snacktrack://**
-exp://**
-http://localhost:8081/**
-http://localhost:19006/**
-```
-
-(The `**` wildcards matter — Expo Go's URL contains your laptop's LAN IP and
-port, which change between networks. `19006` is Expo's web port when 8081 is
-busy.) Leave Site URL alone; it's only the fallback.
-
-I can't do this one — it's a dashboard auth setting, and neither the Supabase MCP
-tools nor the service_role key can reach it. **No longer blocking anything:** the
-code flow made sign-in work without a redirect, and Today, Week and search were
-verified against real data on 2026-08-23.
-
-**Danny:**
-
-### Try the app on your phone
-Phase 1's real app exists now (`mobile/`) and everything I can verify without a
-device checks out: it bundles clean for iOS/Android/web, sign-in works end to end
-(proved 2026-08-23 by requesting a code in the real UI, reading it out of your
-Gmail, and signing in), Today/Week/search were driven by hand against real data,
-and row-level security is locked down. **The one thing only you can do is open it
-on an actual phone** — and the biometric lock in particular is still unverified,
-because `expo-local-authentication` reports no hardware on web, so that screen
-has never rendered.
-
-**Do not tell Danny to install Expo Go from the App Store or Play Store. It does
-not work and it cannot work.** Corrected 2026-08-22 after he tried it and hit
-"Project is incompatible with this version of Expo Go" on a real device.
-
-Apple stopped approving new Expo Go releases; per Expo's own changelog the SDK 55
-build was still stuck in review as of May 2026, and both stores top out at **Expo
-Go 54**. This project is **SDK 57**, and Expo Go only ever runs its own matching
-SDK. Verified directly: the emulator on this machine had `host.exp.exponent`
-versionName 54.0.8 installed from the Play Store, against an SDK 57 project.
-https://expo.dev/changelog/expo-go-and-app-store-may-2026
-
-The two routes that actually work:
-
-**Android (free, and already set up on this machine).** Danny installed Android
-Studio on 2026-08-22 and has an emulator running — `adb` lives at
-`%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe`. Start the dev server, press
-`a`, and Expo CLI installs the SDK-matched Expo Go over adb, bypassing the store
-entirely. If it doesn't replace the older client, sideload it by hand:
-`https://github.com/expo/expo-go-releases/releases/download/Expo-Go-57.0.9/Expo-Go-57.0.9.apk`
-(199 MB), then `adb install -r`. Note the URL — the one linked from expo.dev/go
-is missing the `expo/` owner segment and 404s.
-
-**iPhone (costs $99/yr).** `npx eas-cli@latest go` builds a personalized Expo Go
-and delivers it through TestFlight, which requires an Apple Developer Program
-membership. That makes the "when?" question below load-bearing rather than
-optional — on iOS it is the only way to see this app on a real device.
-
-Also note: in PowerShell, plain `npx` fails with "running scripts is disabled on
-this system" because every execution-policy scope on this machine is Undefined,
-so it defaults to Restricted and blocks `npx.ps1`. Use **`npx.cmd`** and
-**`npm.cmd`**. Do not change the execution policy to work around this.
-
-Whichever route, the check is the same: sign in with email, tap the link when it
-lands, confirm you land on a "Today" screen showing calories and macro targets
-(2200 / 165P / 220C / 70F — the schema defaults, real numbers from your database).
-
-**Do the redirect-URL item above first.** That paragraph used to be a guess
-("if the tap doesn't redirect back, it's *probably* the allowlist"). As of
-2026-08-23 it's confirmed: the allowlist is at its default and every redirect
-this app uses gets silently swapped for `localhost:3000`. The magic-link tap
-*will* dead-end until those four URLs are added. Everything else about the phone
-routes below is unchanged.
-
-**Danny:**
-
 ### Goal-based nutrient tracking — scope it into its own phase, don't sneak it into 2
 From Danny's drinks answer: track more than the four macros (he named sugar), and
 have onboarding ask the user's goals, then recommend or show only what's relevant
@@ -218,43 +44,137 @@ column, and `WANT_NUTRIENTS` in the seeder gains `"2000": "sugar"` and
 `"1079": "fiber"` before the re-seed.
 
 The rest of this item — which nutrients each goal surfaces, and the onboarding
-flow that asks — is still unscoped and still Danny's call.
-
-**Danny:**
-
-### Social sign-in: Google needs 10 minutes from you, Apple needs $99
-From Danny's 2026-08-23 ask for Google / Apple / phone logins. Email code,
-email+password, and biometric unlock are all built. The rest split by what they
-cost you:
-
-**Google** — free, but I can't create it: you make an OAuth client at
-https://console.cloud.google.com/apis/credentials (type "Web application"),
-paste the client ID and secret into Supabase's Google provider, and I wire the
-app side. Also add the redirect URLs above first, since OAuth uses them.
-
-**Apple — $99/year, and it's probably not optional once Google ships.** App
-Store guideline 4.8 requires an equivalent privacy-preserving login alongside
-any third-party social login. Our passwordless email code may well satisfy it
-on its own, but Sign in with Apple is the answer nobody gets rejected for. I'd
-treat Google and Apple as arriving together on iOS rather than assuming we can
-ship Google alone. The $99 also covers installing on your own iPhone, so it
-unblocks the phone test too.
-
-**Phone / SMS** — this one has a *recurring* cost, unlike the others. Supabase
-doesn't send SMS itself; you'd bring Twilio or similar and pay per message,
-forever, including for every failed and re-sent code. For a calorie tracker I'd
-skip it: the email code does the same job for free. Say so if you disagree.
-
-**Notion** — I'd leave this one out, and it's the only one I'd push back on
-outright. It's a workplace identity, and nobody reaches for their Notion login
-to record a burrito. Every extra provider is more config, more to keep working,
-and more App Review surface for no reach.
+flow that asks — is still unscoped and still Danny's call. **Note 2026-08-24:**
+the onboarding screens are being built now (Phase 3) and screen 4 asks the goal,
+so the hook this needs will already exist by the time this phase starts.
 
 **Danny:**
 
 ---
 
 ## ANSWERED
+
+### Build order — features first, auth last (answered 2026-08-24)
+Danny's direction, in his words: *"I want to build out main function, design,
+features before the adding the google authen and the other stuff."*
+
+So the working order is the roadmap's own order — **Phase 3 onboarding/targets,
+then Phase 4 AI logging, then Phase 5 suggestions** — and everything in the
+auth/accounts bucket waits until late in the build:
+
+- Google sign-in (his call: "towards end of build")
+- Apple sign-in and the $99 developer membership
+- The Supabase redirect-URL allowlist, which only those two need
+- Phone/SMS login (declined — recurring Twilio cost for no gain over the email
+  code) and Notion login (declined)
+
+Nothing in Phases 3-5 is blocked by any of it. The email code, email+password,
+and biometric unlock already work, which is all the app needs to be used.
+
+### Phone test — running on the Android emulator 2026-08-24; iPhone deferred by choice
+Danny: *"ive got it on the emulator i dont want to pay for the iphone rn."*
+
+So the Android route worked, and the $99 Apple Developer membership is **not**
+being bought right now. What that settles and what it doesn't:
+
+- **Settled:** the app runs on a real Android runtime, not just a web bundle.
+  Phase 1's "opens on his phone" is close enough to done to stop blocking on it.
+- **Still unverified:** the biometric lock. `expo-local-authentication` reports
+  no hardware on web, so that screen has still never rendered — unless Danny
+  enrolled a fingerprint in the emulator (Extended controls → Fingerprint), it
+  is untested. Worth one check next time he's in there.
+- **Consequence of no Apple membership:** no iPhone install, no Sign in with
+  Apple, and no TestFlight, until that changes. None of it blocks Phases 3-5.
+  It becomes load-bearing again at Phase 8 (Ship), which cannot happen without it.
+
+Keep for reference, because it will come up again: **do not install Expo Go from
+the App Store or Play Store.** Apple stopped approving new Expo Go releases and
+both stores top out at Expo Go 54; this project is SDK 57, and Expo Go only runs
+its own matching SDK. The route that works on Android is the dev server + `a`,
+which installs the SDK-matched client over adb (`adb` at
+`%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe`); if that doesn't replace the
+older client, sideload
+`https://github.com/expo/expo-go-releases/releases/download/Expo-Go-57.0.9/Expo-Go-57.0.9.apk`
+and `adb install -r`. Also: in PowerShell, use **`npx.cmd`** / **`npm.cmd`** —
+plain `npx` hits "running scripts is disabled on this system". Do not change the
+execution policy to work around it.
+
+### Sign-in bug: "logged in before I put in the code" — closed 2026-08-24
+Danny: *"no longer an issue."* Closed without a root-cause answer, which is
+acceptable here because the two defensive fixes that landed on 2026-08-23 were
+built to make it structurally impossible either way:
+
+- `signOut()` uses Supabase's global scope explicitly, so a stale tab can't keep
+  working or hand a refreshed token back.
+- The sign-in screen is authoritative: a session arriving in a tab that never
+  asked for one, while that tab believes it's signed out, is treated as stale
+  litter and signed out again.
+
+The leading theory was always agent litter — a signed-in preview tab the agent
+left open on `localhost:8081`, whose token-refresh timer rewrote the shared
+`localStorage` session. His answer is consistent with that. If it ever recurs,
+reopen this: it would mean a third cause exists.
+
+**Still worth doing eventually, and now filed under the auth work:** drop
+`{{ .ConfirmationURL }}` from the Magic Link template. The app asks for a code;
+a live one-tap link in the same email is a second, untested way in.
+
+### Redirect URLs — I can't reach this one, and it's parked with the auth work
+Danny asked: *"cant you do that?"* Straight answer: **no, not with anything I
+have.** Checked rather than assumed:
+
+- The Supabase MCP server exposes database and project tools (`execute_sql`,
+  `apply_migration`, `get_advisors`, logs, branches…) and **no auth-config
+  endpoint at all**. The allowlist isn't reachable from it.
+- The `service_role` key is a database credential. GoTrue's URI allow-list is
+  platform config, not a table, so no SQL can set it either.
+
+Two ways it *could* happen if it ever becomes urgent:
+
+1. **A Supabase personal access token** (`sbp_…`) from
+   https://supabase.com/dashboard/account/tokens, dropped into `.env.local`.
+   The Management API can then set it in one call:
+   `PATCH /v1/projects/grltvenoqmzhgkfasvlb/config/auth` with `uri_allow_list`.
+   That token is full account access, so it's a real decision, not a shortcut.
+2. **Driving the dashboard in his logged-in Chrome**, which needs him present
+   and needs him to say go — it's an account settings change.
+
+Either way it's ~30 seconds of clicking for him versus setup for me, and **it is
+not blocking anything**: the email-code flow needs no redirect and is proven end
+to end. It's needed only for the password-signup confirmation link, Google/Apple,
+and any magic link already sitting in an inbox. It moves when Google does. The
+values, when that day comes:
+
+```
+snacktrack://**
+exp://**
+http://localhost:8081/**
+http://localhost:19006/**
+```
+
+(The `**` wildcards matter — Expo Go's URL contains the LAN IP and port, which
+change between networks.) Evidence it's actually needed, from 2026-08-23: asking
+Supabase's admin API for links with five different redirects showed it does not
+error on a non-allowlisted URL — it silently swaps in the Site URL
+(`http://localhost:3000`), which is why sign-in once looked "verified end to end"
+with a redirect that never worked.
+
+### Social sign-in — Google at the end of the build, everything else declined
+Danny: *"ill do google sign in towards end of build."* Filed accordingly.
+
+- **Google** — free, ~10 minutes of his time when the day comes: an OAuth client
+  at https://console.cloud.google.com/apis/credentials (type "Web application"),
+  client ID + secret into Supabase's Google provider, and I wire the app side.
+  The redirect URLs above have to go in first, since OAuth uses them.
+- **Apple** — $99/yr, and probably not optional once Google ships (App Store
+  guideline 4.8 wants an equivalent privacy-preserving login alongside any social
+  login; our passwordless email code may satisfy it, but Sign in with Apple is
+  the answer nobody gets rejected for). Deferred with the membership.
+- **Phone / SMS** — declined. Supabase doesn't send SMS; it means Twilio and a
+  per-message cost forever, including failed and re-sent codes, to do what the
+  email code already does free.
+- **Notion** — declined. Workplace identity; nobody reaches for their Notion
+  login to record a burrito.
 
 ### Sign-in email code — done 2026-08-23, verified end to end
 Danny added `<p>Your SNACK TRACK code is: <strong>{{ .Token }}</strong></p>` to

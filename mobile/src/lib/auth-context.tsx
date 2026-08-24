@@ -10,6 +10,7 @@ import {
   setBiometricLockEnabled,
   type BiometricKind,
 } from '@/lib/biometrics';
+import { fetchHasOnboarded } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
 
 type Result = { error: string | null };
@@ -24,6 +25,10 @@ type AuthContextValue = {
   signInWithPassword: (email: string, password: string) => Promise<Result>;
   signUpWithPassword: (email: string, password: string) => Promise<Result & { needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
+  /** Whether onboarding is finished. null while it's still being checked, or signed out. */
+  onboarded: boolean | null;
+  /** Called by the onboarding flow once it has saved, so the gate stops redirecting. */
+  markOnboarded: () => void;
   // Biometric lock
   biometricKind: BiometricKind;
   biometricEnabled: boolean;
@@ -56,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [biometricKind, setBiometricKind] = useState<BiometricKind>('none');
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const handledUrls = useRef(new Set<string>());
   // Mirrors `session` for synchronous reads inside the auth-state-change
   // listener below, which closes over state from its first render only.
@@ -191,6 +197,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  // Keyed on the user id rather than the session object so a routine token
+  // refresh doesn't re-query this on a timer.
+  const userId = session?.user.id ?? null;
+  useEffect(() => {
+    if (!userId) {
+      setOnboarded(null);
+      return;
+    }
+    let cancelled = false;
+    fetchHasOnboarded()
+      .then((ok) => {
+        if (!cancelled) setOnboarded(ok);
+      })
+      .catch(() => {
+        // A failed check must not lock someone out of their own app. Assume
+        // onboarded; the Today screen surfaces the real error.
+        if (!cancelled) setOnboarded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const markOnboarded = useCallback(() => setOnboarded(true), []);
+
   const signOut = async () => {
     // Global scope: revokes every session for this user, not just the local
     // one -- otherwise a stale tab holding the same session keeps working
@@ -227,6 +258,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithPassword,
         signUpWithPassword,
         signOut,
+        onboarded,
+        markOnboarded,
         biometricKind,
         biometricEnabled,
         locked,

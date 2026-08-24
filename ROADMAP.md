@@ -4,17 +4,25 @@ One phase at a time, in order. Each phase has a goal, a short task list, and a
 **done when** line. Nothing moves to the next phase until the current one's
 "done when" is genuinely true and verified by running it.
 
-**CURRENT PHASE: 2 — Core tracker** — every task in it is built, and as of
-2026-08-23 the app has been **signed into and driven by hand**, not just bundled:
-Today, Week and search across all 407,086 foods were verified against real data.
+**CURRENT PHASE: 4 — AI logging.** Phase 3 landed 2026-08-24: the onboarding
+flow was built and driven end to end in the running app against a throwaway
+account, which came out the other side with real targets, a weight row and a
+first logged food. Phase 2 before it is built and verified:
+as of 2026-08-23 the app has been **signed into and driven by hand**, not just
+bundled — Today, Week and search across all 407,086 foods, all against real
+data — and on 2026-08-24 Danny got it running on the Android emulator.
 
-Two "done when" checks remain, both Danny's: opening it on a phone (Phase 1) and
-using it for a real day instead of the prototype (Phase 2).
+**Build order, Danny's call 2026-08-24: features first, auth last.** Phases 3-5
+(onboarding/targets, AI logging, suggestions) come before Google sign-in, Apple,
+and the Supabase redirect allowlist — those three move together, late. No iPhone
+until the $99 Apple membership, which he's declined for now; that only becomes
+load-bearing at Phase 8.
 
-**2026-08-23:** the resend-throttle bug is fixed. The other sign-in bug (a
-session restoring without a code) has two defensive fixes in but is still
-waiting on one answer from Danny — see the top item in `QUESTIONS.md`. Phase 3
-is the open build work in the meantime.
+Both sign-in bugs are closed (resend throttle fixed 2026-08-23; the
+session-restore one closed by Danny 2026-08-24, with two defensive fixes already
+in). One "done when" is still outstanding and it's a usage question, not a build
+one: Phase 2 closes when Danny goes a full day on the app instead of the
+prototype.
 
 **Read `PRODUCT.md` before any decision about features, copy, or design.** The app
 is simple, easy, and doesn't judge anyone. That's the differentiator, not a slogan —
@@ -45,8 +53,9 @@ Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny use
 - [x] Node.js installed (v24.19.0, npm 11.17.0)
 - [x] GitHub repo connected and both branches pushed
 - [x] Expo project created (`mobile/`, SDK 57, expo-router). Bundles clean for
-      web, iOS, and Android — **on-device launch via Expo Go still needs Danny**,
-      see QUESTIONS.md
+      web, iOS, and Android, and **runs on the Android emulator** — Danny had it
+      up 2026-08-24. A physical iPhone waits on the $99 Apple membership,
+      declined for now.
 - [x] Supabase client wired up, reading config from env (`mobile/.env.local`,
       gitignored, `EXPO_PUBLIC_*`)
 - [x] Email sign-in working end to end — verified for real: requested a magic
@@ -65,14 +74,15 @@ Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny use
       both the send and resend buttons disable with a live countdown, and a
       429 that gets through anyway is phrased plainly. Traced through the
       code but not eyeballed — no dev server in this unattended run.
-- [ ] **One sign-in bug still open**: a session restoring without a code being
-      entered. Two defensive fixes landed regardless (`signOut()` uses global
-      scope; the sign-in screen now rejects any session that arrives while it
-      believes it's signed out) — together they should make it structurally
-      impossible going forward. The root-cause question is still queued for
-      Danny in QUESTIONS.md.
-- [ ] Biometric lock unverified — `expo-local-authentication` reports no
-      hardware on web, so the lock screen has never rendered. Needs a device.
+- [x] **Both sign-in bugs closed.** The resend throttle was fixed 2026-08-23.
+      The session-restore one Danny closed 2026-08-24 ("no longer an issue")
+      without a root cause — acceptable because the two defensive fixes that
+      landed anyway (`signOut()` uses global scope; the sign-in screen rejects
+      any session arriving while it believes it's signed out) were built to make
+      it structurally impossible either way. Reopen it if it ever recurs.
+- [ ] Biometric lock still unverified — `expo-local-authentication` reports no
+      hardware on web, so the lock screen has never rendered. Now testable on
+      the emulator if a fingerprint is enrolled (Extended controls → Fingerprint).
 - [x] Row level security verified: exercised the deployed policies directly
       with impersonated JWTs for two different user IDs — a second user gets
       zero rows from `entries` and `profiles`, even when explicitly querying by
@@ -80,8 +90,9 @@ Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny use
 
 **Done when:** Danny opens the app on his phone, signs in, and lands on an empty
 day view backed by the real database.
-*(Signing in and landing on the real day view is proven — done on web 2026-08-23
-with an emailed code. Only the "on his phone" half is outstanding.)*
+*(Met 2026-08-24. Signing in and landing on the real day view was proven on web
+2026-08-23 with an emailed code, and the app now runs on the Android emulator.
+A physical iPhone waits on the Apple membership, deferred by choice.)*
 
 ---
 
@@ -129,23 +140,43 @@ missing anything.
 
 ---
 
-## Phase 3 — Onboarding and targets
+## Phase 3 — Onboarding and targets ✅ done 2026-08-24 (bar one optional screen)
 
 **Goal:** a stranger can install it and get correct targets without help.
 
-- [ ] The seven onboarding screens, plus the optional food-preferences screen
-- [ ] Mifflin-St Jeor + activity math, with the arithmetic shown to the user.
-      **The math itself is built and verified** (`mobile/src/lib/targets.ts`,
-      2026-08-24) — no onboarding UI calls it yet. See BUILD_LOG for the exact
-      verification against Danny's known real numbers.
-- [ ] Editable targets, written to `target_history`
-- [ ] The safety floor: warn under ~1,200 cal (built into `calcTargets()` as
-      `floorWarning`, verified). No-goal-weight-below-healthy-BMI still
-      unbuilt — there's no goal-weight field on `profiles` yet; that's an
-      onboarding-screen decision, not a math one.
+- [x] The onboarding screens — **eight**, not the plan's seven: name,
+      sex/date of birth, height/weight, movement, training, goal, the numbers,
+      and an optional first log. `mobile/src/components/onboarding/`, routed at
+      `/onboarding`, gated on `profiles.onboarded_at` in both `index.tsx` and
+      the root layout so a deep link can't skip it.
+- [ ] The **optional food-preferences screen is deliberately not built.** It
+      feeds Phase 5's suggestions, and what it should ask is tangled up with
+      the still-open nutrient question in QUESTIONS.md. Build it with that
+      answer, not before.
+- [x] Mifflin-St Jeor + activity math, with the arithmetic shown to the user —
+      `mobile/src/lib/targets.ts` (built 2026-08-24), now rendered line by line
+      on the review screen: BMR → × activity multiplier → TDEE → goal
+      adjustment → calories, then each macro's rule. Verified in the running
+      app for Danny's own stats: 1,813 → ×1.725 → 3,128 → −250 → **2,878 cal,
+      180P / 360C / 80F**.
+- [x] Editable targets, written to `target_history` — "Set my own numbers
+      instead" on the review screen, and every finish writes a `target_history`
+      row whose `reason` records whether the numbers were calculated or
+      adjusted by hand. Today's weight goes to `weights` in the same save.
+- [x] The safety floor, **both halves**. Under ~1,200 cal warns plainly and
+      still lets you continue — and it re-checks the hand-edited number, not
+      just the calculated one. The goal-weight half is now built too: a
+      `goal_weight_lb` column was added to `profiles` (migration
+      `add_goal_weight_to_profiles`), the question is only asked for cut/bulk
+      goals, it's skippable, and a goal below BMI 18.5 is refused with the
+      actual pound figure for that height rather than a scold.
 
 **Done when:** a fresh account reaches a personalised target screen and the numbers
 match the plan's worked example for Danny's own stats.
+*(Met 2026-08-24, with the same caveat recorded when the math was built: BMR,
+protein and fat reproduce his real numbers exactly, and calories land at 2,878
+against the 2,900 on record — 0.8% — because that 2,900 was never derived from
+a documented activity/goal formula there was anything to reverse-engineer.)*
 
 ---
 

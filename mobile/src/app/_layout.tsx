@@ -1,4 +1,5 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { LockScreen } from '@/components/lock-screen';
@@ -13,13 +14,33 @@ function LockGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Same reasoning as LockGate: gating only `/` would let a deep link or a
+// restored navigation state land on /(tabs)/today with onboarding never shown.
+// This one redirects from an effect rather than rendering <Redirect>, because
+// the navigator has to exist before anything can navigate.
+function OnboardingGate({ children }: { children: React.ReactNode }) {
+  const { session, onboarded } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (session && onboarded === false && pathname !== '/onboarding') {
+      router.replace('/onboarding');
+    }
+  }, [session, onboarded, pathname, router]);
+
+  return <>{children}</>;
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AuthProvider>
         <LockGate>
-          <Stack screenOptions={{ headerShown: false }} />
+          <OnboardingGate>
+            <Stack screenOptions={{ headerShown: false }} />
+          </OnboardingGate>
         </LockGate>
       </AuthProvider>
     </ThemeProvider>

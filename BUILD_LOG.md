@@ -5,6 +5,125 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-08-24 (later) — Phase 3 done: onboarding, driven end to end in the running app
+
+Danny was at the keyboard for this one, and answered all four open questions
+first. Recorded in QUESTIONS.md and acted on here:
+
+1. **The app is on the Android emulator**, and he's not paying the $99 for an
+   iPhone right now. Phase 1's "on his phone" is met; Apple sign-in, TestFlight
+   and any physical-iPhone check are parked until that changes.
+2. **The redirect URLs — "cant you do that?"** Checked properly instead of
+   assuming: no. The Supabase MCP server exposes database and project tools and
+   **no auth-config endpoint at all**, and the `service_role` key is a database
+   credential while GoTrue's URI allow-list is platform config, so no SQL
+   reaches it either. The two ways it could happen (a `sbp_` personal access
+   token dropped in `.env.local`, or driving the dashboard in his own logged-in
+   Chrome) are both written up in QUESTIONS.md. Not urgent: nothing is blocked
+   on it while the email-code flow is the way in.
+3. **The session-restore sign-in bug is closed** — "no longer an issue." No root
+   cause, which is acceptable only because the two defensive fixes from
+   2026-08-23 were built to make it impossible either way. Reopen if it recurs.
+4. **Google sign-in is deferred to the end of the build**, and his direction for
+   everything else was explicit: *"build out main function, design, features
+   before the adding the google authen and the other stuff."* So the order is
+   the roadmap's own — Phase 3, then 4, then 5 — with all the auth/accounts work
+   late.
+
+**Built: the whole onboarding flow.** Eight screens, not the plan's seven (the
+extra is a name/welcome step; the plan's "first natural-language log" is here as
+an optional manual first log, since the sentence box is Phase 4 work and pulling
+it in early would have meant building it twice).
+
+- `mobile/src/lib/onboarding.ts` — the draft shape, the parsing and validation
+  for every answer, and one `saveOnboarding()` that writes all three places a
+  finish touches: `profiles`, today's row in `weights`, and the first
+  `target_history` row.
+- `mobile/src/components/onboarding/` — `onboarding-ui.tsx` (the step frame,
+  progress dots, choice grid, number field), `onboarding-flow.tsx` (all state,
+  so Back never loses an answer), `targets-review.tsx` (the "show your work"
+  screen).
+- Route `/onboarding`, gated **twice** on `profiles.onboarded_at`: `index.tsx`
+  waits for the check before redirecting, and a root-layout `OnboardingGate`
+  catches deep links — the same reasoning the existing `LockGate` was built on.
+  The gate redirects from an effect rather than rendering `<Redirect>`, because
+  the navigator has to exist before anything can navigate. Onboarding status
+  lives on `AuthContext` alongside `session` and `locked`, with a
+  `markOnboarded()` the flow calls after saving so the last step doesn't get
+  bounced straight back.
+- **Migration `add_goal_weight_to_profiles`** — `goal_weight_lb numeric(6,2)`,
+  nullable. `db/schema.sql` updated in the same commit, per its own header rule.
+
+**Verified twice over, and the second one is the one that counts.**
+
+*First, the logic on its own.* 27 assertions run under `node`'s TS stripping
+against mechanical copies of `targets.ts`/`meals.ts`/`onboarding.ts` — only the
+import lines rewritten and `supabase` stubbed, nothing else touched. All pass:
+Danny's stats reproduce BMR 1,813 / 180P / 80F exactly and 2,878 cal; 5'10" and
+178 cm agree; "6 ft" with blank inches works; 12 inches, 31 February, month 13
+and an age of 8 are all rejected; the healthy-BMI floor at 5'10" computes to
+129 lb; a 120 lb goal is refused and 135 lb allowed; a blank goal weight is
+allowed and a recomp goal is never asked; "I don't track my steps" with a desk
+lifestyle gives exactly the same answer as typing 4,000 steps.
+
+*Then the real thing.* Created a throwaway Supabase account with the admin API
+(**no email, no touching Danny's inbox and no rate limit spent**), signed into
+the running dev server as it, and drove all eight screens by hand:
+
+- Signing in landed **straight on onboarding**, not Today — the gate works.
+- The goal-weight floor fired in the app with the right number and the right
+  tone: *"For your height, 129 lb is the low end of the healthy range…"*, and
+  **Next stayed blocked** until it was fixed. Switching to recomp made the
+  question disappear entirely.
+- The review screen rendered the whole calculation: 1,813 → × 1.725 →
+  3,128 → − 250 → **2,878 cal**, with 180P / 360C / 80F and each macro's rule
+  spelled out underneath.
+- Hand-editing calories to 900 updated the headline live and tripped the
+  1,200 floor warning **on the edited number**, phrased as information and still
+  letting you continue.
+- Saved with hand-set 2,900 / 180 / 365 / 80. Checked the database directly:
+  every profile field correct, `weights` holding 179.00 for today,
+  `target_history` reading `onboarding — adjusted by hand`, `onboarded_at` set,
+  `goal_weight_lb` correctly null for a recomp goal.
+- The optional first log worked through the real food search ("chobani" against
+  the 399k-row branded index) and Today then showed **53 / 2900** with the entry
+  under dinner. A reload went straight to Today instead of back to onboarding.
+- No console errors. `tsc --noEmit` clean, `expo export --platform web` clean.
+- **Cleaned up after myself**: the test user was deleted (cascade verified — 0
+  rows left in profiles/entries/weights/target_history) and the preview server
+  stopped, so no signed-in tab is left lying around. That specific litter cost a
+  whole diagnostic cycle last time.
+
+**Three things to know.**
+
+- **Danny's own account has `onboarded_at` null**, so his next sign-in goes
+  through onboarding. That's the right outcome rather than a bug — his profile
+  is still carrying the schema defaults (2200/165/220/70) instead of his real
+  2900/180/365/80, and finishing onboarding fixes that in one pass.
+- `expo lint` can't run — `eslint` isn't in `node_modules`, and trying it
+  scaffolded an `eslint.config.js`, added two devDependencies and rewrote 5,566
+  lines of `package-lock.json` without ever producing a working linter. All of
+  that was reverted; adding a linter is its own decision, not a side effect of a
+  Phase 3 commit. `tsc --noEmit` is the check this repo has actually been using.
+- Known environment quirk, not a bug: in the Browser pane the `AddEntryModal`'s
+  contents linger in the DOM after closing, because the pane doesn't composite
+  frames so React Native Web's `animationend` never fires. Same thing the log
+  noted before; screenshots fail for the same reason, so this run was driven
+  through `read_page` and the accessibility tree.
+
+**Next run:** check QUESTIONS.md first, as always — the nutrient/goal question is
+the only OPEN item and it's still unanswered. Then **Phase 4, AI logging**, which
+is the feature the whole product exists for and the next thing in Danny's stated
+order. Its first task needs neither him nor an API key: build `evals/meals.jsonl`
+(50 real meals with hand-checked numbers) and `evals/run.py`, then get a baseline
+out of the prototype's `parse.py` **before** writing a single Claude call — the
+roadmap is explicit that the baseline comes first, and there's no way to tell
+whether the AI pipeline is an improvement without it. `ANTHROPIC_API_KEY` in
+`.env.local` is still empty, and the key belongs in an edge function rather than
+the client, so that's the point at which Danny gets asked for one.
+
+---
+
 ## 2026-08-24 — Phase 3 started: the target-math module, checked against Danny's real numbers
 
 Unattended scheduled run. Checked QUESTIONS.md first — every OPEN item still has
