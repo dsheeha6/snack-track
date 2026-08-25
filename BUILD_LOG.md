@@ -5,6 +5,91 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-08-25 — Phase 4 started: the eval harness and the baseline it exists to beat
+
+Unattended scheduled run. QUESTIONS.md checked first — the one OPEN item
+(goal-based nutrient tracking) still has no answer under it, nothing to act
+on. Phase 4 is next per every prior "Next run" note, and its own task list is
+explicit that the baseline comes before any Claude call, so that's the whole
+session: no API key was touched, none is in `.env.local` yet.
+
+- **`evals/meals.jsonl`** — 50 meal sentences, each with hand-entered
+  calorie/protein/carb/fat ground truth (cross-checked against standard
+  USDA-ballpark values, and for chain-restaurant items each chain's own
+  published nutrition figures — not copied from the prototype's ingredient
+  table, since scoring the prototype against its own numbers would be
+  meaningless). Every meal is tagged by what it's testing:
+  - **20 simple/explicit-quantity meals** close to the prototype's ingredient
+    table — the easy case.
+  - **10 ambiguous meals** with no stated portion ("a bowl of oatmeal", "a
+    handful of almonds") — ground truth assumes a typical serving; these
+    test whether a pipeline's default guess lands near a normal one.
+  - **7 typo/casual-phrasing meals** ("3 eggz", "peanutbutter" run together,
+    "grabbed a protien bar") — the way people actually type, not clean text.
+  - **7 restaurant/branded meals** (Chipotle, Big Mac, Chick-fil-A, Starbucks,
+    Five Guys, Panda Express, Subway) that the local ingredient table has no
+    entries for at all — the case a real food-database lookup should win
+    outright and a fixed local table structurally cannot.
+  - **6 mixed/edge cases** — fractional quantities (3/4 cup), word-numbers
+    ("half a dozen"), a zero-calorie meal, a genuinely unknowable homemade
+    item.
+- **`evals/run.py`** — loads the jsonl, runs a pipeline over each meal's raw
+  text, and scores calorie/protein/carb/fat against ground truth (mean and
+  median absolute % error, % of meals within a 15%-on-calories tolerance,
+  error broken down by tag, worst-10 list, unresolved-item count). Built with
+  a `--pipeline` registry so the Claude pipeline slots in later as a second
+  entry with the same `{calories, protein, carbs, fat}` output shape — the
+  roadmap's "done when" is this same harness reporting Claude beating the
+  number below, so the harness had to exist in a form that can score both.
+  The baseline pipeline runs the prototype's real `parse_text()` (imported
+  directly from `../calorie-tracker/parse.py`, not reimplemented) with an
+  **empty logging history** on purpose — otherwise the "same as last time"
+  shortcut would make the baseline look better at reading a sentence than it
+  actually is, and a future Claude pipeline has no equivalent memory to lean
+  on either, so scoring with it on would bias the comparison.
+- **Verified by running it**, not by reasoning about the code: `python
+  evals/run.py --json evals/baseline_results.json` executes cleanly and
+  produces real numbers. Spot-checked one result by hand (m01, "3 eggs on
+  sourdough with sriracha") to make sure the harness itself wasn't lying —
+  traced the 471-vs-351-calorie gap to a real and defensible cause: the
+  sentence's SPLIT regex separates "on sourdough" from the leading "3", so
+  the prototype falls back to sourdough's table default of 2 slices where
+  the hand-written ground truth assumed 1 — a genuine natural-language
+  ambiguity, not a bug in either the parser or the eval.
+- **The baseline, for the record — this is the number Phase 4's "done when"
+  has to beat:**
+  - Mean calorie error **19.8%**, median **0.0%** (most meals it knows
+    outright; the mean is dragged up by the ones it doesn't).
+  - **56% of meals (28/50) land within 15% on calories.**
+  - **12/50 meals have at least one item the parser can't resolve at all** —
+    every restaurant meal, plus a couple of typos ("protien", "peanutbutter"
+    run together) and one deliberately unknowable homemade item.
+  - By tag: restaurant items average **36.4%** calorie error (all-or-nothing
+    misses drag this up — an unresolved item scores as 0 predicted, 100%
+    error), typos **61.0%**, word-numbers ("half a dozen") **56.8%**, but
+    plain multi-item meals with explicit quantities average **3.8-4.3%** —
+    the table itself is accurate; the failures are reading comprehension
+    (typos, unstated units, world knowledge) rather than nutrition data.
+  - Full per-meal breakdown in `evals/baseline_results.json` (not committed —
+    regenerate with the command above; it's a derived artifact, not a source
+    of truth).
+- **Not built this run**: anything touching Claude. No edge function, no
+  `ANTHROPIC_API_KEY` in `.env.local` (still empty), no structured-output
+  parsing. That's next, now that there's a number to beat and a harness that
+  can prove it.
+
+**Next run:** check QUESTIONS.md first, as always. Then Phase 4's next item:
+the edge function that holds the Anthropic key (needs `ANTHROPIC_API_KEY`
+from Danny — queue it in QUESTIONS.md if it's still not in `.env.local`) and
+the structured-output prompt that turns a meal sentence into the same
+`{items, totals}` shape `parse.py` already produces, so it can resolve
+against `foods` and slot into `evals/run.py` as a second pipeline. Once that
+exists, run the harness on both and see whether the baseline above actually
+gets beaten before building anything further on top of it (follow-up
+questions, `personal_foods` corrections, `ai_usage` metering).
+
+---
+
 ## 2026-08-24 (later) — Phase 3 done: onboarding, driven end to end in the running app
 
 Danny was at the keyboard for this one, and answered all four open questions

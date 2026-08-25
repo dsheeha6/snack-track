@@ -184,9 +184,13 @@ a documented activity/goal formula there was anything to reverse-engineer.)*
 
 **Goal:** the feature the whole product exists for.
 
-- [ ] `evals/meals.jsonl` — 50 real meals with hand-checked numbers
-- [ ] `evals/run.py` — accuracy harness; get a baseline from the prototype's
-      `parse.py` before writing any Claude call
+- [x] `evals/meals.jsonl` — 50 meal sentences with hand-checked calorie/
+      protein/carb/fat ground truth, tagged by what they test (simple,
+      ambiguous quantity, typo, restaurant/not-in-table, etc).
+- [x] `evals/run.py` — accuracy harness; **baseline established from the
+      prototype's `parse.py`** before any Claude call: 19.8% mean calorie
+      error, 56% of meals within 15%, 12/50 meals with an unresolved item.
+      Full numbers and what a Claude pipeline needs to beat in BUILD_LOG.
 - [ ] Edge function holding the Anthropic key, never called from the client
 - [ ] Structured-output parse → resolve against `foods` → confidence flags
 - [ ] Follow-up questions: high-variance foods only, capped at two

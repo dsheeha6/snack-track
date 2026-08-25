@@ -11,3 +11,4 @@ node_modules/
 dist/
 __pycache__/
 scripts/.cache/
+evals/*_results.json

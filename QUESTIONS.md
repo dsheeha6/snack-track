@@ -8,6 +8,23 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
+### Anthropic API key — needed to start the real AI logging pipeline
+Phase 4's baseline is done (see BUILD_LOG 2026-08-25: `evals/meals.jsonl` +
+`evals/run.py`, prototype parser scored at 19.8% mean calorie error). The
+next Phase 4 task is the edge function that calls Claude to parse a meal
+sentence, and that needs a real key.
+
+**What to do:** grab an API key from https://console.anthropic.com/settings/keys
+and paste it here:
+
+**Danny:**
+
+It goes straight into `.env.local` (gitignored) and gets read only from the
+edge function, never the client — the same reasoning `docs/supabase.md`
+already lays out for the `service_role` key. Once it's in, the harness in
+`evals/run.py` gets a second `--pipeline claude` entry scored against the
+same 50 meals, so there's a real before/after number rather than a guess.
+
 ### Goal-based nutrient tracking — scope it into its own phase, don't sneak it into 2
 From Danny's drinks answer: track more than the four macros (he named sugar), and
 have onboarding ask the user's goals, then recommend or show only what's relevant
