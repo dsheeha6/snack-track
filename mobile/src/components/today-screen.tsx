@@ -11,7 +11,7 @@ import { WaterCard } from '@/components/water-card';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
 import { biometricLabel } from '@/lib/biometrics';
-import { addEntry, deleteEntry, fetchEntries, type Entry, type NewEntry } from '@/lib/entries';
+import { addEntries, addEntry, deleteEntry, fetchEntries, type Entry, type NewEntry } from '@/lib/entries';
 import { guessMealSlot, localDateString, MEAL_COLORS, MEAL_LABELS, MEAL_SLOTS, type MealSlot } from '@/lib/meals';
 import { supabase } from '@/lib/supabase';
 import {
@@ -98,6 +98,16 @@ export function TodayScreen() {
   const handleSave = async (entry: NewEntry) => {
     const saved = await addEntry(entry);
     setEntries((prev) => [...prev, saved]);
+    setModalMeal(null);
+  };
+
+  // One sentence usually becomes several rows. Not optimistic like water: these
+  // rows carry real numbers the user is about to act on, and showing a meal as
+  // logged before the insert lands would mean silently dropping food from the
+  // day's totals if it failed.
+  const handleSaveMany = async (newEntries: NewEntry[]) => {
+    const saved = await addEntries(newEntries);
+    setEntries((prev) => [...prev, ...saved]);
     setModalMeal(null);
   };
 
@@ -253,6 +263,7 @@ export function TodayScreen() {
         eatenOn={eatenOn}
         onClose={() => setModalMeal(null)}
         onSave={handleSave}
+        onSaveMany={handleSaveMany}
       />
     </ThemedView>
   );

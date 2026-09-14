@@ -5,6 +5,82 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-13 (later) — parse-meal wired into the app, and driven by hand
+
+Phase 4's other half. **Verified by using it, not by reading it**: the web
+bundle was run, a throwaway account signed in, and a sentence typed into the
+real modal produced real rows in `entries`.
+
+- **`mobile/src/lib/parse-meal.ts`** — client for the edge function.
+  `functions.invoke` attaches the session JWT automatically, so the Anthropic
+  key stays server-side and this call carries only the user's session.
+  Non-2xx responses are unwrapped: `error.message` is a useless generic
+  ("Edge Function returned a non-2xx status code") while the function's own
+  plain-English message is in the `Response` on `error.context`.
+- **It requests `resolve: 'none'`, which is a measured choice.** `estimate`
+  would run a `foods` lookup per item to attach `food_id` — but **`entries` has
+  no `food_id` column**, so today that buys a database round trip per item and
+  nothing else, and this morning's eval showed the match would be wrong as
+  often as right (banana → banana pepper). Flip it to `estimate` when
+  single-best resolution is fixed and there's a column to put the id in.
+- **`addEntries()` in `lib/entries.ts`** — one insert for the whole sentence.
+  Inserting per item would mean a half-logged meal whenever one call failed,
+  and the user having to work out which half to retype.
+- **The add-food modal now leads with the sentence box.** PRODUCT.md is
+  explicit that "typing a sentence is the fastest path and stays the primary
+  one", so search and the manual form moved below it rather than the sentence
+  being bolted on underneath. Parsing swaps the modal into a review state:
+  every item with its quantity, a confidence note, its calories and a × to drop
+  it, then running totals and one button. Removing an item recomputes the
+  totals and the button label.
+- **Confidence copy is about the guess, never the person** — "estimated
+  portion", not "you didn't say how much". PRODUCT.md's test is whether a
+  string would feel bad to read on a day someone already feels bad.
+- **Onboarding's last step got the same treatment**, so the first thing a new
+  user sees is the primary interaction. Its `logged` state now holds a finished
+  sentence rather than a bare name, because one sentence can log four foods and
+  "eggs and 3 more is on today's list" is not English.
+
+**What was actually verified, in the running app:**
+
+1. `tsc --noEmit` clean. It caught a real miss — `onboarding-flow.tsx` mounts
+   the same modal and needed the new prop.
+2. Web bundle boots, renders, no console errors.
+3. **The `authenticated` path, which had never been tested.** Every call
+   earlier today used `service_role`; the app sends a user JWT. Created a
+   throwaway account via the admin API, confirmed `role=authenticated`, and
+   called the function with it — HTTP 200.
+4. **The whole loop by hand**: typed *"2 eggz on sourdough and a grande latte
+   from starbucks"* → came back as **Eggs** (typo fixed), **Sourdough bread**
+   (marked "estimated portion"), **Starbucks grande caffe latte** with the real
+   grande serving → removed the sourdough, watched totals drop 665 → 345 and
+   the button change to "Add all 2" → logged it → both rows appeared under
+   lunch and the macro bars moved. Confirmed in the database as `source='ai'`.
+5. Throwaway account deleted afterwards (entries and profile cascade); a second
+   one from a crashed first attempt was tracked down and deleted too. Security
+   advisor re-run: clean.
+
+**Two things noticed and deliberately not fixed here:**
+
+- **`expo lint` fails with 5 errors**, all `react-hooks/set-state-in-effect`,
+  across `auth-context.tsx`, `water-card.tsx`, `use-color-scheme.web.ts` and
+  the two effects in `add-entry-modal.tsx`. **All five predate this change** —
+  confirmed against `git show HEAD:` — but the project's own lint gate is red,
+  which will matter the moment anything runs it in CI.
+- **The security advisor's `auth_leaked_password_protection` warning was
+  dismissed on 2026-08-22 as "doesn't apply — this app is passwordless
+  magic-link only". That reasoning expired on 2026-08-23**, when email+password
+  sign-in was added. It's a dashboard toggle and Danny's call, but the old note
+  shouldn't be trusted next time it appears.
+
+**Next run:** Danny using it for a real day is now the gate on *two* "done
+when" lines — Phase 2's (stop using the prototype for a full day) and the
+practical half of Phase 4's. After that: follow-up questions for high-variance
+foods (capped at two), corrections into `personal_foods`, and `ai_usage`
+metering, then Phase 5.
+
+---
+
 ## 2026-09-13 — The edge function that calls Claude, on Haiku, plus the eval entry that scores it
 
 Danny added the Anthropic key and picked the model: *"i would like to use

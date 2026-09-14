@@ -17,7 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
-import { addEntry, type NewEntry } from '@/lib/entries';
+import { addEntries, addEntry, type NewEntry } from '@/lib/entries';
 import { guessMealSlot, localDateString } from '@/lib/meals';
 import {
   EMPTY_DRAFT,
@@ -96,9 +96,22 @@ export function OnboardingFlow() {
     }
   };
 
+  // `logged` holds a finished sentence rather than a bare name, because one
+  // typed sentence can log four foods and "eggs and 3 more is on today's list"
+  // does not read like English.
   const handleFirstLog = async (entry: NewEntry) => {
     const saved = await addEntry(entry);
-    setLogged(saved.name);
+    setLogged(`${saved.name} is on today's list.`);
+    setLogOpen(false);
+  };
+
+  const handleFirstLogMany = async (entries: NewEntry[]) => {
+    const saved = await addEntries(entries);
+    setLogged(
+      saved.length === 1
+        ? `${saved[0].name} is on today's list.`
+        : `All ${saved.length} are on today's list.`
+    );
     setLogOpen(false);
   };
 
@@ -369,7 +382,7 @@ export function OnboardingFlow() {
             title={logged ? 'That’s it — you’re tracking' : 'Want to log something now?'}
             subtitle={
               logged
-                ? `${logged} is on today's list. Everything else works the same way.`
+                ? `${logged} Everything else works the same way.`
                 : 'Whatever you last ate. Or skip it — the app works just as well starting tomorrow.'
             }
             onNext={() => router.replace('/(tabs)/today')}
@@ -400,6 +413,7 @@ export function OnboardingFlow() {
             eatenOn={localDateString()}
             onClose={() => setLogOpen(false)}
             onSave={handleFirstLog}
+            onSaveMany={handleFirstLogMany}
           />
         </>
       );

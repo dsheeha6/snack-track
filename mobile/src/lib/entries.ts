@@ -65,6 +65,28 @@ export async function addEntry(entry: NewEntry): Promise<Entry> {
   return data;
 }
 
+/**
+ * Insert several entries at once.
+ *
+ * One sentence usually becomes three or four rows, and inserting them
+ * separately would mean a partially-logged meal whenever one call failed —
+ * the user would see some of their food and have to work out which half to
+ * re-enter. A single insert either takes the whole meal or none of it.
+ */
+export async function addEntries(entries: NewEntry[]): Promise<Entry[]> {
+  if (entries.length === 0) return [];
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in.');
+  const { data, error } = await supabase
+    .from('entries')
+    .insert(entries.map((e) => ({ ...e, user_id: user.id })))
+    .select(ENTRY_COLUMNS);
+  if (error) throw error;
+  return data;
+}
+
 export async function deleteEntry(id: string): Promise<void> {
   const { error } = await supabase.from('entries').delete().eq('id', id);
   if (error) throw error;

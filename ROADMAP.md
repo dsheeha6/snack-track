@@ -221,19 +221,27 @@ a documented activity/goal formula there was anything to reverse-engineer.)*
       prefer `source='usda'` for unbranded queries and return nothing rather
       than a bad guess. Linking a banana to a banana pepper is wrong even when
       the numbers are unaffected.
-- [ ] **Wire `parse-meal` into the app** — the remaining half of Phase 4's
-      "done when". Nothing in `mobile/` calls it yet.
+- [x] **Wire `parse-meal` into the app** — done 2026-09-13 and **driven by hand
+      in the running app**, not just bundled. The sentence box is now the first
+      thing in the add-food modal per PRODUCT.md ("typing a sentence is the
+      fastest path and stays the primary one"); search and the manual form moved
+      below it. Type → review what came back → remove anything wrong → one
+      button logs the lot as `source='ai'`. Also wired into onboarding's last
+      step, so the first thing a new user is shown is the primary interaction.
 - [ ] Follow-up questions: high-variance foods only, capped at two
 - [ ] Corrections captured into `personal_foods`
 - [ ] Token metering into `ai_usage`
 
 **Done when:** the harness reports the Claude pipeline beating the prototype's
 baseline on the 50-meal set, and Danny can log a day by typing sentences.
-*(First half met 2026-09-13 — 14.2% vs 19.8%. The second half is untouched:
-nothing in the app calls `parse-meal` yet, so there is still no way to log a
-meal by typing a sentence. That wiring is the remaining Phase 4 work along with
-the follow-up questions, `personal_foods` corrections and `ai_usage` metering
-below.)*
+*(**Both halves met 2026-09-13.** The harness reports 14.2% vs 19.8%, and
+typing a sentence into the running app logs a meal — driven by hand against a
+throwaway account: "2 eggz on sourdough and a grande latte from starbucks"
+came back as Eggs / Sourdough bread / Starbucks grande caffe latte, and the two
+kept rows landed under lunch as `source='ai'` with the macro bars updating.
+Still open in this phase: follow-up questions, `personal_foods` corrections and
+`ai_usage` metering. Danny has not yet used it for a real day — that is what
+closes Phase 2's outstanding "done when" too.)*
 
 ---
 

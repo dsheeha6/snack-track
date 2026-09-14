@@ -8,6 +8,7 @@ import { Brand, Spacing } from '@/constants/theme';
 import type { NewEntry } from '@/lib/entries';
 import { searchFoods, type Food } from '@/lib/foods';
 import { MEAL_COLORS, MEAL_LABELS, MEAL_SLOTS, type MealSlot } from '@/lib/meals';
+import { confidenceNote, parseMeal, type ParsedItem } from '@/lib/parse-meal';
 
 type AddEntryModalProps = {
   visible: boolean;
@@ -15,14 +16,26 @@ type AddEntryModalProps = {
   eatenOn: string;
   onClose: () => void;
   onSave: (entry: NewEntry) => Promise<void>;
+  onSaveMany: (entries: NewEntry[]) => Promise<void>;
 };
 
 type Field = 'name' | 'qty' | 'calories' | 'protein' | 'carbs' | 'fat';
 
 const EMPTY_FORM = { name: '', qty: '', calories: '', protein: '', carbs: '', fat: '' };
 
-export function AddEntryModal({ visible, defaultMeal, eatenOn, onClose, onSave }: AddEntryModalProps) {
+export function AddEntryModal({
+  visible,
+  defaultMeal,
+  eatenOn,
+  onClose,
+  onSave,
+  onSaveMany,
+}: AddEntryModalProps) {
   const [meal, setMeal] = useState<MealSlot>(defaultMeal);
+  const [sentence, setSentence] = useState('');
+  const [parsing, setParsing] = useState(false);
+  const [parsed, setParsed] = useState<ParsedItem[] | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Food[]>([]);
   const [searching, setSearching] = useState(false);
@@ -34,10 +47,15 @@ export function AddEntryModal({ visible, defaultMeal, eatenOn, onClose, onSave }
   useEffect(() => {
     if (visible) {
       setMeal(defaultMeal);
+      setSentence('');
+      setParsing(false);
+      setParsed(null);
+      setParseError(null);
       setQuery('');
       setResults([]);
       setSource('manual');
       setForm(EMPTY_FORM);
+      setSaving(false);
       setError(null);
     }
   }, [visible, defaultMeal]);
@@ -66,6 +84,44 @@ export function AddEntryModal({ visible, defaultMeal, eatenOn, onClose, onSave }
       clearTimeout(timer);
     };
   }, [query]);
+
+  const handleParse = async () => {
+    if (!sentence.trim() || parsing) return;
+    setParsing(true);
+    setParseError(null);
+    try {
+      const result = await parseMeal(sentence, meal);
+      setParsed(result.items);
+    } catch (e) {
+      setParseError(e instanceof Error ? e.message : 'Could not read that one.');
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handleLogParsed = async () => {
+    if (!parsed || parsed.length === 0 || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSaveMany(
+        parsed.map((item) => ({
+          eaten_on: eatenOn,
+          meal,
+          name: item.name,
+          qty: item.qty || null,
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fat: item.fat,
+          source: 'ai' as const,
+        }))
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save those.');
+      setSaving(false);
+    }
+  };
 
   const pickFood = (food: Food) => {
     setSource('database');
@@ -110,6 +166,17 @@ export function AddEntryModal({ visible, defaultMeal, eatenOn, onClose, onSave }
     }
   };
 
+  const reviewing = parsed !== null && parsed.length > 0;
+  const parsedTotals = (parsed ?? []).reduce(
+    (acc, i) => ({
+      calories: acc.calories + i.calories,
+      protein: acc.protein + i.protein,
+      carbs: acc.carbs + i.carbs,
+      fat: acc.fat + i.fat,
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet">
       <ThemedView style={styles.container}>
@@ -138,71 +205,176 @@ export function AddEntryModal({ visible, defaultMeal, eatenOn, onClose, onSave }
               ))}
             </View>
 
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search foods…"
-              placeholderTextColor="#9098a3"
-              style={styles.input}
-              autoCorrect={false}
-            />
-            {searching && <ActivityIndicator style={styles.searchSpinner} />}
-            {results.length > 0 && (
-              <View style={styles.resultsBox}>
-                {results.map((food) => (
-                  <Pressable key={food.id} onPress={() => pickFood(food)} style={styles.resultRow}>
-                    <ThemedText>{food.name}</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {/* The brand is the whole point once branded products are in
-                          the table: searching "quest bar" surfaces a row named only
-                          "APPLE PIE", which is unidentifiable without it. */}
-                      {food.brand ? `${food.brand} · ` : ''}
-                      {Math.round(food.calories)} cal / {food.serving_label}
+            {reviewing ? (
+              <>
+                <ThemedView type="backgroundElement" style={styles.form}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Here&apos;s what I got
+                  </ThemedText>
+
+                  {parsed.map((item, index) => {
+                    const note = confidenceNote(item);
+                    return (
+                      <View key={`${item.name}-${index}`} style={styles.parsedRow}>
+                        <View style={styles.parsedMain}>
+                          <ThemedText>{item.name}</ThemedText>
+                          <ThemedText type="small" themeColor="textSecondary">
+                            {[item.qty, note].filter(Boolean).join(' · ')}
+                          </ThemedText>
+                        </View>
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {Math.round(item.calories)} cal
+                        </ThemedText>
+                        <Pressable
+                          onPress={() => setParsed(parsed.filter((_, i) => i !== index))}
+                          hitSlop={10}
+                          accessibilityLabel={`Remove ${item.name}`}
+                        >
+                          <ThemedText style={styles.remove}>×</ThemedText>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+
+                  <View style={styles.totalsRow}>
+                    <ThemedText type="smallBold" style={styles.totalsLabel}>
+                      {Math.round(parsedTotals.calories)} cal
                     </ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {round1(parsedTotals.protein)}p · {round1(parsedTotals.carbs)}c ·{' '}
+                      {round1(parsedTotals.fat)}f
+                    </ThemedText>
+                  </View>
+                </ThemedView>
+
+                {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+
+                <Pressable
+                  onPress={handleLogParsed}
+                  disabled={saving}
+                  style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <ThemedText style={styles.saveButtonText}>
+                      Add {parsed.length === 1 ? 'it' : `all ${parsed.length}`} to {MEAL_LABELS[meal]}
+                    </ThemedText>
+                  )}
+                </Pressable>
+
+                <Pressable onPress={() => setParsed(null)} style={styles.startOver} hitSlop={8}>
+                  <ThemedText type="linkPrimary">Type it again</ThemedText>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                {/* The sentence box leads, per PRODUCT.md: "typing a sentence is
+                    the fastest path and stays the primary one". Search and the
+                    manual form stay below it as the fallbacks they are. */}
+                <ThemedView type="backgroundElement" style={styles.form}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    What did you eat?
+                  </ThemedText>
+                  <TextInput
+                    value={sentence}
+                    onChangeText={setSentence}
+                    placeholder="chicken burrito bowl and a latte"
+                    placeholderTextColor="#9098a3"
+                    style={[styles.input, styles.sentenceInput]}
+                    multiline
+                    autoCorrect
+                    onSubmitEditing={handleParse}
+                    editable={!parsing}
+                  />
+                  <Pressable
+                    onPress={handleParse}
+                    disabled={!sentence.trim() || parsing}
+                    style={[
+                      styles.parseButton,
+                      (!sentence.trim() || parsing) && styles.saveButtonDisabled,
+                    ]}
+                  >
+                    {parsing ? (
+                      <ActivityIndicator color="#ffffff" />
+                    ) : (
+                      <ThemedText style={styles.saveButtonText}>Log it</ThemedText>
+                    )}
                   </Pressable>
-                ))}
-              </View>
+                  {parseError && <ThemedText style={styles.error}>{parseError}</ThemedText>}
+                </ThemedView>
+
+                <ThemedText type="small" themeColor="textSecondary" style={styles.orLabel}>
+                  or look it up
+                </ThemedText>
+
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Search foods…"
+                  placeholderTextColor="#9098a3"
+                  style={styles.input}
+                  autoCorrect={false}
+                />
+                {searching && <ActivityIndicator style={styles.searchSpinner} />}
+                {results.length > 0 && (
+                  <View style={styles.resultsBox}>
+                    {results.map((food) => (
+                      <Pressable key={food.id} onPress={() => pickFood(food)} style={styles.resultRow}>
+                        <ThemedText>{food.name}</ThemedText>
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {/* The brand is the whole point once branded products are in
+                              the table: searching "quest bar" surfaces a row named only
+                              "APPLE PIE", which is unidentifiable without it. */}
+                          {food.brand ? `${food.brand} · ` : ''}
+                          {Math.round(food.calories)} cal / {food.serving_label}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+
+                <ThemedView type="backgroundElement" style={styles.form}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Or enter it directly
+                  </ThemedText>
+                  <TextInput
+                    value={form.name}
+                    onChangeText={(v) => setField('name', v)}
+                    placeholder="What did you eat?"
+                    placeholderTextColor="#9098a3"
+                    style={styles.input}
+                  />
+                  <TextInput
+                    value={form.qty}
+                    onChangeText={(v) => setField('qty', v)}
+                    placeholder="Quantity (optional, e.g. 1 cup)"
+                    placeholderTextColor="#9098a3"
+                    style={styles.input}
+                  />
+                  <View style={styles.macroRow}>
+                    <NumberField label="cal" value={form.calories} onChangeText={(v) => setField('calories', v)} />
+                    <NumberField label="P" value={form.protein} onChangeText={(v) => setField('protein', v)} />
+                    <NumberField label="C" value={form.carbs} onChangeText={(v) => setField('carbs', v)} />
+                    <NumberField label="F" value={form.fat} onChangeText={(v) => setField('fat', v)} />
+                  </View>
+                </ThemedView>
+
+                {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+
+                <Pressable
+                  onPress={handleSave}
+                  disabled={!isValid || saving}
+                  style={[styles.saveButton, (!isValid || saving) && styles.saveButtonDisabled]}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <ThemedText style={styles.saveButtonText}>Add to {MEAL_LABELS[meal]}</ThemedText>
+                  )}
+                </Pressable>
+              </>
             )}
-
-            <ThemedView type="backgroundElement" style={styles.form}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Or enter it directly
-              </ThemedText>
-              <TextInput
-                value={form.name}
-                onChangeText={(v) => setField('name', v)}
-                placeholder="What did you eat?"
-                placeholderTextColor="#9098a3"
-                style={styles.input}
-              />
-              <TextInput
-                value={form.qty}
-                onChangeText={(v) => setField('qty', v)}
-                placeholder="Quantity (optional, e.g. 1 cup)"
-                placeholderTextColor="#9098a3"
-                style={styles.input}
-              />
-              <View style={styles.macroRow}>
-                <NumberField label="cal" value={form.calories} onChangeText={(v) => setField('calories', v)} />
-                <NumberField label="P" value={form.protein} onChangeText={(v) => setField('protein', v)} />
-                <NumberField label="C" value={form.carbs} onChangeText={(v) => setField('carbs', v)} />
-                <NumberField label="F" value={form.fat} onChangeText={(v) => setField('fat', v)} />
-              </View>
-            </ThemedView>
-
-            {error && <ThemedText style={styles.error}>{error}</ThemedText>}
-
-            <Pressable
-              onPress={handleSave}
-              disabled={!isValid || saving}
-              style={[styles.saveButton, (!isValid || saving) && styles.saveButtonDisabled]}
-            >
-              {saving ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <ThemedText style={styles.saveButtonText}>Add to {MEAL_LABELS[meal]}</ThemedText>
-              )}
-            </Pressable>
           </ScrollView>
         </SafeAreaView>
       </ThemedView>
@@ -241,6 +413,10 @@ function toNumber(value: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -276,6 +452,49 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Brand.ink,
     backgroundColor: Brand.paper,
+  },
+  sentenceInput: {
+    minHeight: 72,
+    textAlignVertical: 'top',
+  },
+  parseButton: {
+    backgroundColor: Brand.blue,
+    borderRadius: Spacing.two,
+    paddingVertical: Spacing.three,
+    alignItems: 'center',
+  },
+  orLabel: {
+    textAlign: 'center',
+  },
+  parsedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.one,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E1B1614',
+  },
+  parsedMain: {
+    flex: 1,
+    gap: 2,
+  },
+  remove: {
+    fontSize: 22,
+    lineHeight: 24,
+    color: Brand.coral,
+    paddingHorizontal: Spacing.one,
+  },
+  totalsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: Spacing.one,
+  },
+  totalsLabel: {
+    flex: 1,
+  },
+  startOver: {
+    alignItems: 'center',
   },
   searchSpinner: {
     marginTop: -Spacing.two,
