@@ -5,6 +5,211 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-13 — The edge function that calls Claude, on Haiku, plus the eval entry that scores it
+
+Danny added the Anthropic key and picked the model: *"i would like to use
+haiku"* → `claude-haiku-4-5`. Built the function and wired it into the harness.
+**Not yet scored** — see the two blockers at the bottom, one of which is his.
+
+- **`.env.local` was UTF-16 again.** Same trap as the `service_role` key on
+  2026-08-22: Notepad/PowerShell save UTF-16 by default and a plain `utf-8` read
+  dies with `UnicodeDecodeError: 0xff in position 0`, which reads like a missing
+  key rather than an encoding problem. Converted back to UTF-8 (BOM stripped)
+  and **fixed the cause this time**: `load_env_local()` in `evals/run.py` sniffs
+  the BOM and decodes UTF-16 or `utf-8-sig`. The copies in
+  `scripts/seed_foods_usda.py` and `scripts/seed_foods_branded.py` are still the
+  old brittle version — port it over when either is next touched.
+- **Key sanity-checked without printing it**: it's a standard `sk-ant-api...`
+  key, not `sk-ant-admin...` (admin keys are org-management only and the
+  Messages API rejects them), and carries no stray quotes or whitespace.
+- **`supabase/functions/parse-meal/index.ts`** — the first edge function in this
+  project. Takes `{text, meal, resolve, model}`, returns the same
+  `{items, totals, meal, questions}` shape `../calorie-tracker/parse.py`
+  produces, so it drops into the existing UI and the harness scores both the
+  same way. Decisions worth recording:
+  - **Strict tool use, not `output_config.format`.** Both give schema-valid
+    JSON, but strict tool use has a raw wire shape that needs no helper subpath
+    import — and this file cannot be run locally (no Deno, no Docker on this
+    machine), so first execution is on deploy. Fewer exotic imports in code you
+    can't test locally is worth more than the marginally nicer API.
+  - **`verify_jwt` alone was not enough, and this is the one real security
+    finding of the session.** It proves only that the token was signed by this
+    project — and the *anon key is a valid project JWT that ships inside the app
+    bundle*. Anyone who unzips the APK could have called a function holding an
+    Anthropic key. The function now reads the `role` claim and accepts only
+    `authenticated` or `service_role`; `anon` gets a 401. No signature check in
+    our code on purpose — the platform already did it before the handler ran.
+  - **Three resolve modes** rather than one guess about whether the food
+    database helps: `none` (Claude's numbers alone — what the first score
+    measures), `estimate` (Claude's numbers stand, a `foods` match only attaches
+    `food_id`/provenance), `db` (a match overrides the numbers). This turns the
+    roadmap's "resolve against `foods` → confidence flags" line into something
+    measurable instead of assumed, and reuses the existing `search_foods` RPC
+    through the caller's own JWT so RLS and the authenticated-only grant apply
+    exactly as they do in the app.
+  - **No thinking configured.** Haiku 4.5 takes `budget_tokens` rather than
+    adaptive thinking and rejects `effort`; for a one-sentence extraction it
+    earns nothing, so it's omitted — which is also the cheap and fast setting.
+  - **Missing-secret case returns plain English**, not an SDK stack trace,
+    because that is by far the most likely first-run failure.
+- **`evals/run.py` gained `--pipeline claude`**, plus `--model` and `--resolve`.
+  It calls the **deployed** function over HTTPS rather than reimplementing the
+  prompt in Python: a local copy would drift from what ships, and a score for
+  code nobody runs is worse than no score. 8-way threaded, and it prints token
+  totals and a dollar cost per run and per meal. "Unresolved" is mapped to
+  Claude's `confidence: "low"` so the column means the same thing it means for
+  the baseline — an item the pipeline couldn't put a real number on.
+- **Baseline re-run as a regression check**: still 19.8% mean calorie error,
+  28/50 within 15%, 12 meals with an unresolved item. Identical to 2026-08-25,
+  so the refactor moved nothing.
+- **The Supabase project had auto-paused.** Free tier pauses after ~1 week idle
+  and the last run was 2026-08-25, so `deploy_edge_function` failed with
+  `status 'INACTIVE'`. Restored it via MCP; it came back `COMING_UP`. **Worth
+  knowing for every future unattended run: the first call of a session may fail
+  purely because the project is asleep, and the fix is a restore, not a bug
+  hunt.**
+
+**RESULT (same day, after Danny set the secret): Haiku beats the baseline.**
+
+| | baseline (`parse.py`) | Haiku 4.5 |
+|---|---|---|
+| Calorie mean % error | 19.8% | **14.2%** |
+| Calorie median % error | **0.0%** | 6.4% |
+| Within 15% on calories | 28/50 (56%) | **35/50 (70%)** |
+| Meals with an unresolved item | 12 | **1** |
+
+Cost: **$0.106 per 50-meal run, $0.0021/meal.** 68,046 input / 7,685 output
+tokens. Run twice (see the caveat below): the second gave 14.6% / 34-of-50, so
+**run-to-run variance is roughly ±0.5 points of mean error and ±1 meal** — small,
+but real, and worth remembering before reading much into a 1-point difference
+between future runs.
+
+**The per-tag view is the actual finding, and it is a trade rather than a clean
+win.** Only tags with n≥3 shown, because most of the others are a single meal and
+mean nothing:
+
+| tag | n | baseline | Haiku | delta |
+|---|---|---|---|---|
+| typo | 3 | 61.0% | 7.3% | **−53.7** |
+| word-number | 3 | 56.8% | 21.7% | **−35.1** |
+| not-in-table | 10 | 39.9% | 7.2% | **−32.7** |
+| restaurant | 7 | 36.4% | 3.7% | **−32.7** |
+| ambiguous | 9 | 22.5% | 17.2% | −5.3 |
+| no-explicit-unit | 6 | 10.9% | 6.4% | −4.6 |
+| casual-phrasing | 4 | 5.0% | 9.7% | +4.7 |
+| simple | 18 | 4.3% | 14.9% | **+10.7** |
+| multi-item | 7 | 3.8% | 20.2% | **+16.5** |
+
+Read that as: **Claude fixed every reading-comprehension failure the baseline
+had, and gave back accuracy on the easy meals the ingredient table already knew
+cold.** The median error moving 0.0% → 6.4% says the same thing from another
+angle — the table is *exactly* right on what it knows, Claude is *approximately*
+right on everything. Bias is not the cause: 20 over-estimates to 23 under.
+
+**That is the argument for the hybrid, and it is now a testable one rather than a
+hunch:** let Claude do the reading (which foods, how much) and let `foods` supply
+the numbers where it has a confident match. That is exactly what `--resolve
+estimate` and `--resolve db` exist to measure, and `search_foods` is callable by
+both `service_role` and `authenticated` (checked, not assumed), so the eval can
+run them. **Not run yet** — each is another ~$0.11 and it's Danny's money.
+
+**Caveat on this run, recorded because the numbers above depend on it:** the eval
+was run twice. The first run's headline got cut off by a `tail` in the command
+that produced it, so it was re-run to read the calorie line — ~$0.11 of avoidable
+spend. Read the saved `evals/claude_results.json` instead of re-running; that is
+what it is for.
+
+**Getting the secret set took four attempts and every failure was worth a
+guard.** Recorded because all four are the kind that look like a broken key:
+1. Secret saved with the **project name in the Name field** (`Snack-Track`), so
+   `ANTHROPIC_API_KEY` was simply absent. The function now lists the non-secret
+   env names it can see in its 500, which is what found it.
+2. Then a **workspace-scoping 400** — a key created at org level rather than
+   inside a workspace needs an `anthropic-workspace-id` header. Added an optional
+   `ANTHROPIC_WORKSPACE_ID` secret for that case; unused, since the good key is
+   workspace-scoped.
+3. Then `.env.local` **reverted to UTF-16** (Notepad), so PowerShell's
+   `Get-Content` read the 108-char key as 88 characters.
+4. Then the Supabase secret held **256 characters with internal whitespace** —
+   the PowerShell command text itself. `Set-Clipboard` fails silently when run
+   without an interactive window station, so the clipboard still held the copied
+   command. **Never verify a clipboard copy by printing the length of the
+   variable you copied *from*** — that reports success when the copy failed.
+   The fix that worked was printing the key and copying it by hand.
+
+The durable lesson is the diagnostic, not the four mistakes: a `debug: true`
+body flag (service_role only) returns the stored key's **length, a 12-hex
+SHA-256 prefix, and whitespace flags**. Comparing that prefix against the same
+hash of `.env.local` settles "is the secret the key I think it is" in one free
+call, and it is what ended this. Use it first next time.
+
+**`--resolve db` was then run and it is WORSE. Do not ship it.** ($0.11)
+
+| | `resolve=none` | `resolve=db` |
+|---|---|---|
+| Calories mean | 14.2% | 16.1% |
+| **Protein mean** | **16.3%** | **32.4%** |
+| **Carbs mean** | **24.4%** | **35.3%** |
+| **Fat mean** | **33.2%** | **39.7%** |
+| Within 15% on calories | 35/50 | 37/50 |
+
+Two separate things are true here and they matter for whoever reads this next:
+
+**1. The calorie column of this experiment is meaningless — that's a design flaw
+in the mode, not a result.** `db` computes `servings = claude_calories / row_calories`
+and then `calories = row_calories * servings`, which is algebraically
+`claude_calories` again. **The db path cannot change calories by construction.**
+The 14.2 → 16.1 and 35 → 37 differences are run-to-run noise (±0.5 / ±1, measured
+earlier), not the database doing anything. Only the macros are a real comparison.
+
+**2. The macros got much worse, and the cause is match quality, not the scaling.**
+79 of 92 items matched a `foods` row, and the matches are bad in a specific,
+diagnosable way — generic food words hit the 399k branded rows before the 7,793
+clean USDA whole foods:
+
+- `wine` → **CIRIO RED WINE VINEGAR**
+- `banana` → **PICKERFRESH MEDIUM HOT SLICED BANANA PEPPER**
+- `oatmeal` → **LECOUR'S OATMEAL RAISIN SOFT COOKED COOKIES**
+- `Chipotle Chicken Bowl` → **Old El Paso Chipotle Chicken Burrito Bowl** (the
+  supermarket freezer product, not the restaurant — and the restaurant tag was
+  Claude's single best category at 3.7%)
+
+`search_foods` orders by exact-name, then prefix, then `source='usda'`, then
+`length(search_text)`. With `lim: 1` and a one-word query, a short branded name
+containing the word beats the correct whole food. **The branded load that made
+search good for the app's own search box makes it bad for automated single-best
+resolution.**
+
+**Conclusion: ship `resolve: estimate`** — Claude's numbers stand, the database
+is used only to attach `food_id`. And note that even *that* is not trustworthy
+yet: linking a logged banana to a banana pepper is wrong even when the numbers
+don't change. Before the `food_id` link or any `db` numbers can ship,
+`search_foods` needs a resolution path that prefers `source='usda'` for
+unbranded queries and returns nothing rather than a bad guess.
+
+One fragile code path found and worth fixing when this is next touched: a matched
+row with 0 calories makes `servings` default to 1 and zeroes the item. It only
+hit `water` → `IGA WATER` this run, where 0 is the right answer anyway, so it did
+no damage — but it would silently zero a real food whose row has bad data.
+
+**Still blocked on nothing.** Previous blockers, both now cleared:
+
+1. ~~Danny sets the `ANTHROPIC_API_KEY` secret~~ — done, after the four
+   attempts above.
+2. ~~Then run it~~ — done. Results above.
+
+**Next run:** the question is no longer "does Claude beat the table", it's
+"can we keep both halves". Score `--resolve estimate` and `--resolve db`
+(~$0.11 each) and compare against the `none` numbers above, specifically on the
+`simple` and `multi-item` tags where the database should win back the +10.7 and
++16.5 regressions without giving up the typo/restaurant gains. If `db` does that,
+it's the shipping mode and the confidence flags follow from it. Only if the
+hybrid fails to recover those tags is `--model claude-sonnet-5` (~$0.25) worth
+trying — the failures here are portion-size judgement, not comprehension, and a
+bigger model is not obviously the fix for that.
+
+---
+
 ## 2026-08-25 — Phase 4 started: the eval harness and the baseline it exists to beat
 
 Unattended scheduled run. QUESTIONS.md checked first — the one OPEN item

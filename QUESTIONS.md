@@ -8,22 +8,20 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
-### Anthropic API key — needed to start the real AI logging pipeline
-Phase 4's baseline is done (see BUILD_LOG 2026-08-25: `evals/meals.jsonl` +
-`evals/run.py`, prototype parser scored at 19.8% mean calorie error). The
-next Phase 4 task is the edge function that calls Claude to parse a meal
-sentence, and that needs a real key.
+### Set the ANTHROPIC_API_KEY secret on the edge function — 30 seconds, and it's the last thing blocking Phase 4
+The key is in `.env.local` (added 2026-09-13, verified a standard `sk-ant-api...`
+key, not an admin one). But `.env.local` is a *local* file — the deployed
+`parse-meal` function can't read it. Supabase function secrets are separate, and
+there is no MCP tool that sets them, so this one is genuinely yours.
 
-**What to do:** grab an API key from https://console.anthropic.com/settings/keys
-and paste it here:
+**What to do:** https://supabase.com/dashboard/project/grltvenoqmzhgkfasvlb/settings/functions
+→ Edge Functions → Secrets → add `ANTHROPIC_API_KEY` with the same value that's
+in `.env.local`. Then say so and the eval runs.
+
+Until it's set the function returns a plain-English 500 saying exactly this, so
+there's no mystery failure to debug.
 
 **Danny:**
-
-It goes straight into `.env.local` (gitignored) and gets read only from the
-edge function, never the client — the same reasoning `docs/supabase.md`
-already lays out for the `service_role` key. Once it's in, the harness in
-`evals/run.py` gets a second `--pipeline claude` entry scored against the
-same 50 meals, so there's a real before/after number rather than a guess.
 
 ### Goal-based nutrient tracking — scope it into its own phase, don't sneak it into 2
 From Danny's drinks answer: track more than the four macros (he named sugar), and
@@ -70,6 +68,25 @@ so the hook this needs will already exist by the time this phase starts.
 ---
 
 ## ANSWERED
+
+### Anthropic API key — done 2026-09-13, and the model is Haiku
+Danny pasted a key into `.env.local` and chose the model himself: *"i would like
+to use haiku"* → `claude-haiku-4-5`. Sanity-checked without printing it: it's a
+standard `sk-ant-api...` key, not an `sk-ant-admin...` one (admin keys are for
+org management and are rejected by the Messages API), and it has no stray quotes.
+
+**He saved it as UTF-16 again** — the same trap as the `service_role` key on
+2026-08-22, and it cost the first ten minutes of this session. Converted back to
+UTF-8 and, this time, fixed the cause: `load_env_local()` in `evals/run.py`
+sniffs the BOM and decodes UTF-16 or `utf-8-sig` as needed. **The two seeders in
+`scripts/` still have the old brittle copy** — worth porting the same three lines
+over next time either one is touched.
+
+On the model choice: Haiku 4.5 is $1/$5 per MTok against Opus 5's $5/$25, which
+at a ~1k-in/300-out parse is about **$0.0025 a meal** — roughly $0.38/month at
+Danny's ~5 meals a day, and ~$0.13 for a full 50-meal eval run. `--model` on the
+harness swaps the tier, so if Haiku doesn't clear the 19.8% baseline, testing
+Sonnet 5 costs a quarter and changes one string in the function.
 
 ### Build order — features first, auth last (answered 2026-08-24)
 Danny's direction, in his words: *"I want to build out main function, design,

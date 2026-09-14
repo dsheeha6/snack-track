@@ -191,14 +191,49 @@ a documented activity/goal formula there was anything to reverse-engineer.)*
       prototype's `parse.py`** before any Claude call: 19.8% mean calorie
       error, 56% of meals within 15%, 12/50 meals with an unresolved item.
       Full numbers and what a Claude pipeline needs to beat in BUILD_LOG.
-- [ ] Edge function holding the Anthropic key, never called from the client
-- [ ] Structured-output parse → resolve against `foods` → confidence flags
+- [x] Edge function holding the Anthropic key, never called from the client —
+      `supabase/functions/parse-meal/index.ts`, built 2026-09-13 on
+      **`claude-haiku-4-5`** (Danny's pick). Strict tool use for schema-valid
+      JSON; returns the prototype's `{items, totals}` shape. Hardened past
+      `verify_jwt`, which by itself accepts the **anon key that ships in the app
+      bundle** — the function reads the role claim and takes only
+      `authenticated` / `service_role`. **Written and deployed but not yet
+      executed**: it needs the `ANTHROPIC_API_KEY` *function secret*, which is
+      separate from `.env.local` and is Danny's to set (QUESTIONS.md).
+- [x] `--pipeline claude` in `evals/run.py`, with `--model` and `--resolve`,
+      calling the deployed function rather than a Python copy of the prompt.
+      Reports tokens and dollars per run and per meal.
+- [x] **Run it** — done 2026-09-13. **Haiku beats the baseline: 14.2% mean
+      calorie error vs 19.8%, 35/50 within 15% vs 28/50, and 1 meal with an
+      unresolved item vs 12.** $0.106 a run, $0.0021 a meal. Full per-tag
+      breakdown in BUILD_LOG — the short version is that Claude fixed every
+      reading-comprehension failure (typos −53.7, word-numbers −35.1,
+      restaurant −32.7) and gave back accuracy on the easy meals the ingredient
+      table already knew (simple +10.7, multi-item +16.5).
+- [x] Structured-output parse → resolve against `foods` → confidence flags.
+      All three modes built and two scored. **`db` lost and will not ship:**
+      protein 16.3% → 32.4%, carbs 24.4% → 35.3%, fat 33.2% → 39.7%. Cause is
+      match quality, not scaling — generic words hit the 399k branded rows
+      first (`wine` → red wine *vinegar*, `banana` → banana *pepper*, `oatmeal`
+      → oatmeal raisin *cookies*). **`estimate` is the shipping mode**: Claude's
+      numbers, database only for the `food_id` link.
+- [ ] Fix single-best food resolution before the `food_id` link is trusted —
+      prefer `source='usda'` for unbranded queries and return nothing rather
+      than a bad guess. Linking a banana to a banana pepper is wrong even when
+      the numbers are unaffected.
+- [ ] **Wire `parse-meal` into the app** — the remaining half of Phase 4's
+      "done when". Nothing in `mobile/` calls it yet.
 - [ ] Follow-up questions: high-variance foods only, capped at two
 - [ ] Corrections captured into `personal_foods`
 - [ ] Token metering into `ai_usage`
 
 **Done when:** the harness reports the Claude pipeline beating the prototype's
 baseline on the 50-meal set, and Danny can log a day by typing sentences.
+*(First half met 2026-09-13 — 14.2% vs 19.8%. The second half is untouched:
+nothing in the app calls `parse-meal` yet, so there is still no way to log a
+meal by typing a sentence. That wiring is the remaining Phase 4 work along with
+the follow-up questions, `personal_foods` corrections and `ai_usage` metering
+below.)*
 
 ---
 
