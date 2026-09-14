@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { requireUserId, supabase } from '@/lib/supabase';
 import type { MealSlot } from '@/lib/meals';
 
 export type Entry = {
@@ -52,13 +52,10 @@ export type NewEntry = {
 };
 
 export async function addEntry(entry: NewEntry): Promise<Entry> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in.');
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('entries')
-    .insert({ ...entry, user_id: user.id })
+    .insert({ ...entry, user_id: userId })
     .select(ENTRY_COLUMNS)
     .single();
   if (error) throw error;
@@ -75,13 +72,10 @@ export async function addEntry(entry: NewEntry): Promise<Entry> {
  */
 export async function addEntries(entries: NewEntry[]): Promise<Entry[]> {
   if (entries.length === 0) return [];
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in.');
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('entries')
-    .insert(entries.map((e) => ({ ...e, user_id: user.id })))
+    .insert(entries.map((e) => ({ ...e, user_id: userId })))
     .select(ENTRY_COLUMNS);
   if (error) throw error;
   return data;

@@ -23,67 +23,79 @@ type Field = 'name' | 'qty' | 'calories' | 'protein' | 'carbs' | 'fat';
 
 const EMPTY_FORM = { name: '', qty: '', calories: '', protein: '', carbs: '', fat: '' };
 
-export function AddEntryModal({
-  visible,
+export function AddEntryModal({ visible, ...formProps }: AddEntryModalProps) {
+  // Every open starts from a blank form, and that reset is a remount rather
+  // than an effect full of setters. The form holds a dozen pieces of state;
+  // clearing them from an effect meant each open rendered the previous
+  // session's form once and then threw it away on a second pass.
+  //
+  // The key advances on the way open and never on the way closed, so the sheet
+  // animating away still shows what the user was looking at.
+  const [openKey, setOpenKey] = useState(0);
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) setOpenKey((k) => k + 1);
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={formProps.onClose}
+      presentationStyle="pageSheet"
+    >
+      <AddEntryForm key={openKey} {...formProps} />
+    </Modal>
+  );
+}
+
+function AddEntryForm({
   defaultMeal,
   eatenOn,
   onClose,
   onSave,
   onSaveMany,
-}: AddEntryModalProps) {
+}: Omit<AddEntryModalProps, 'visible'>) {
   const [meal, setMeal] = useState<MealSlot>(defaultMeal);
   const [sentence, setSentence] = useState('');
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState<ParsedItem[] | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Food[]>([]);
-  const [searching, setSearching] = useState(false);
+  // Results are kept next to the query they came back for. Everything else --
+  // whether the list on screen is still current, whether a search is
+  // outstanding -- is read off that pair during render, so the effect below
+  // never has to write state synchronously just to clear a stale list.
+  const [search, setSearch] = useState<{ query: string; foods: Food[] }>({ query: '', foods: [] });
   const [source, setSource] = useState<NewEntry['source']>('manual');
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (visible) {
-      setMeal(defaultMeal);
-      setSentence('');
-      setParsing(false);
-      setParsed(null);
-      setParseError(null);
-      setQuery('');
-      setResults([]);
-      setSource('manual');
-      setForm(EMPTY_FORM);
-      setSaving(false);
-      setError(null);
-    }
-  }, [visible, defaultMeal]);
+  const trimmedQuery = query.trim();
+  const results = search.query === trimmedQuery ? search.foods : [];
+  // Covers the debounce window as well as the request itself: from the first
+  // keystroke until results for exactly this query land.
+  const searching = trimmedQuery.length > 0 && search.query !== trimmedQuery;
 
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
+    if (!trimmedQuery) return;
     let cancelled = false;
-    setSearching(true);
     const timer = setTimeout(() => {
-      searchFoods(query)
+      searchFoods(trimmedQuery)
         .then((foods) => {
-          if (!cancelled) setResults(foods);
+          if (!cancelled) setSearch({ query: trimmedQuery, foods });
         })
         .catch(() => {
-          if (!cancelled) setResults([]);
-        })
-        .finally(() => {
-          if (!cancelled) setSearching(false);
+          if (!cancelled) setSearch({ query: trimmedQuery, foods: [] });
         });
     }, 300);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [trimmedQuery]);
 
   const handleParse = async () => {
     if (!sentence.trim() || parsing) return;
@@ -133,7 +145,6 @@ export function AddEntryModal({
       carbs: String(food.carbs),
       fat: String(food.fat),
     });
-    setResults([]);
     setQuery('');
   };
 
@@ -178,8 +189,7 @@ export function AddEntryModal({
   );
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet">
-      <ThemedView style={styles.container}>
+    <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
             <View style={styles.header}>
@@ -376,9 +386,8 @@ export function AddEntryModal({
               </>
             )}
           </ScrollView>
-        </SafeAreaView>
-      </ThemedView>
-    </Modal>
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 

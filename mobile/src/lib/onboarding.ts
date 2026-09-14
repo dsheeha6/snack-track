@@ -2,7 +2,7 @@
 // `targets.ts`; this file is the shape of the answers, the validation that
 // PRODUCT.md's safety floor requires, and the one save that commits it all.
 
-import { supabase } from '@/lib/supabase';
+import { requireUserId, supabase } from '@/lib/supabase';
 import {
   ageYearsFromBirthDate,
   calcTargets,
@@ -171,10 +171,7 @@ export type FinalTargets = {
  * review screen lets people adjust the numbers before they land here.
  */
 export async function saveOnboarding(draft: OnboardingDraft, targets: FinalTargets, edited: boolean): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in.');
+  const userId = await requireUserId();
 
   const birthDate = birthDateFromDraft(draft);
   const heightCm = heightCmFromDraft(draft);
@@ -206,13 +203,13 @@ export async function saveOnboarding(draft: OnboardingDraft, targets: FinalTarge
       target_fat: targets.fat,
       onboarded_at: new Date().toISOString(),
     })
-    .eq('id', user.id);
+    .eq('id', userId);
   if (profileError) throw profileError;
 
   const measuredOn = localDateString();
   const { error: weightError } = await supabase
     .from('weights')
-    .upsert({ user_id: user.id, measured_on: measuredOn, weight_lb: weightLb }, { onConflict: 'user_id,measured_on' });
+    .upsert({ user_id: userId, measured_on: measuredOn, weight_lb: weightLb }, { onConflict: 'user_id,measured_on' });
   if (weightError) throw weightError;
 
   const reason = [
@@ -224,7 +221,7 @@ export async function saveOnboarding(draft: OnboardingDraft, targets: FinalTarge
     .join(' — ');
 
   const { error: historyError } = await supabase.from('target_history').insert({
-    user_id: user.id,
+    user_id: userId,
     effective_on: measuredOn,
     calories: targets.calories,
     protein: targets.protein,

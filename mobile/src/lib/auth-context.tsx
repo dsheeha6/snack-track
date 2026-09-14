@@ -61,7 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [biometricKind, setBiometricKind] = useState<BiometricKind>('none');
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const [locked, setLocked] = useState(false);
-  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  // Stored against the user it was checked for, rather than as a bare boolean.
+  // Signing out (or switching accounts) then reads as "not known yet" during
+  // render, instead of needing an effect to reset the flag afterwards.
+  const [onboardedFor, setOnboardedFor] = useState<{ userId: string; value: boolean } | null>(null);
   const handledUrls = useRef(new Set<string>());
   // Mirrors `session` for synchronous reads inside the auth-state-change
   // listener below, which closes over state from its first render only.
@@ -200,27 +203,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Keyed on the user id rather than the session object so a routine token
   // refresh doesn't re-query this on a timer.
   const userId = session?.user.id ?? null;
+  // null while signed out, and while the answer for this user is still in
+  // flight -- both derived here rather than written back by the effect below.
+  const onboarded = onboardedFor && onboardedFor.userId === userId ? onboardedFor.value : null;
+
   useEffect(() => {
-    if (!userId) {
-      setOnboarded(null);
-      return;
-    }
+    if (!userId) return;
     let cancelled = false;
     fetchHasOnboarded()
       .then((ok) => {
-        if (!cancelled) setOnboarded(ok);
+        if (!cancelled) setOnboardedFor({ userId, value: ok });
       })
       .catch(() => {
         // A failed check must not lock someone out of their own app. Assume
         // onboarded; the Today screen surfaces the real error.
-        if (!cancelled) setOnboarded(true);
+        if (!cancelled) setOnboardedFor({ userId, value: true });
       });
     return () => {
       cancelled = true;
     };
   }, [userId]);
 
-  const markOnboarded = useCallback(() => setOnboarded(true), []);
+  const markOnboarded = useCallback(() => {
+    if (userId) setOnboardedFor({ userId, value: true });
+  }, [userId]);
 
   const signOut = async () => {
     // Global scope: revokes every session for this user, not just the local

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -21,6 +21,14 @@ type WaterCardProps = {
 // failure — same no-scold rule as the calorie bar (PRODUCT.md).
 export function WaterCard({ ounces, target, onAdd, onUndo, onChangeTarget }: WaterCardProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Bumped on the way open so the sheet below remounts with empty fields and
+  // the current goal. It deliberately doesn't change on close, so the sheet
+  // that slides away is still the one the user was looking at.
+  const [sheetKey, setSheetKey] = useState(0);
+  const openSheet = () => {
+    setSheetKey((k) => k + 1);
+    setSheetOpen(true);
+  };
   const pct = target > 0 ? ounces / target : 0;
   const widthPct = Math.max(0, Math.min(1, pct)) * 100;
   const remaining = target - ounces;
@@ -49,7 +57,7 @@ export function WaterCard({ ounces, target, onAdd, onUndo, onChangeTarget }: Wat
         <Pressable onPress={() => onAdd(TAP_OUNCES)} style={styles.addButton}>
           <ThemedText style={styles.addButtonText}>+ {TAP_OUNCES} oz</ThemedText>
         </Pressable>
-        <Pressable onPress={() => setSheetOpen(true)} hitSlop={8} style={styles.secondary}>
+        <Pressable onPress={openSheet} hitSlop={8} style={styles.secondary}>
           <ThemedText type="linkPrimary">custom</ThemedText>
         </Pressable>
         {onUndo && (
@@ -60,6 +68,7 @@ export function WaterCard({ ounces, target, onAdd, onUndo, onChangeTarget }: Wat
       </View>
 
       <WaterSheet
+        key={sheetKey}
         visible={sheetOpen}
         target={target}
         onClose={() => setSheetOpen(false)}
@@ -79,6 +88,9 @@ export function WaterCard({ ounces, target, onAdd, onUndo, onChangeTarget }: Wat
 // Custom amount and the editable daily goal live together. The goal has no
 // settings screen to live on yet (that's Phase 3) and putting it here keeps
 // "editable" true today without inventing one.
+//
+// Mounted fresh on every open (see `sheetKey`), so both fields simply start
+// from their initial values -- no effect re-seeding them after the fact.
 function WaterSheet({
   visible,
   target,
@@ -95,17 +107,15 @@ function WaterSheet({
   const [amount, setAmount] = useState('');
   const [goal, setGoal] = useState(String(round(target)));
 
-  useEffect(() => {
-    if (visible) {
-      setAmount('');
-      setGoal(String(round(target)));
-    }
-  }, [visible, target]);
-
   const amountValue = Number(amount);
   const amountValid = Number.isFinite(amountValue) && amountValue > 0;
   const goalValue = Number(goal);
-  const goalValid = Number.isFinite(goalValue) && goalValue > 0 && goalValue !== round(target);
+  // Any sensible number can be saved, including the one already set. Greying
+  // Save out when the value matches the current goal was defensible as "nothing
+  // to do", but it reads as a broken button: the field opens pre-filled, so the
+  // very first thing someone sees is a disabled Save next to their own number.
+  // Re-saving the same value costs one request and nothing else.
+  const goalValid = Number.isFinite(goalValue) && goalValue > 0;
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>

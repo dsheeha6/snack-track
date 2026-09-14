@@ -11,8 +11,6 @@ export type Food = {
   fat: number;
 };
 
-const FOOD_COLUMNS = 'id, name, brand, serving_label, calories, protein, carbs, fat';
-
 // Ranking lives in the `search_foods` database function, not here — see the
 // add_search_foods_ranking migration. Once ~399k branded products joined the
 // 7,793 whole foods, the old `ilike + order by name` returned whichever brand

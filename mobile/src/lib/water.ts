@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { requireUserId, supabase } from '@/lib/supabase';
 
 // Hydration, deliberately kept apart from entries.ts. Water never touches the
 // calorie or macro totals and never appears as a row in a meal section — it's
@@ -33,13 +33,10 @@ export async function fetchWater(loggedOn: string): Promise<WaterEntry[]> {
 // user_id is stamped here rather than trusted from the call site — water_log.user_id
 // is not null and RLS requires auth.uid() = user_id, the same trap addEntry() hit.
 export async function addWater(loggedOn: string, ounces: number): Promise<WaterEntry> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in.');
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('water_log')
-    .insert({ user_id: user.id, logged_on: loggedOn, ounces })
+    .insert({ user_id: userId, logged_on: loggedOn, ounces })
     .select(WATER_COLUMNS)
     .single();
   if (error) throw error;
@@ -55,14 +52,19 @@ export function sumOunces(entries: WaterEntry[]): number {
   return entries.reduce((total, e) => total + Number(e.ounces), 0);
 }
 
+// `.select()` on the update is load-bearing, not decoration. Without it
+// PostgREST answers an update that matched nothing with 204 and no error, so a
+// row that RLS hid or an id that didn't match would look exactly like success —
+// the widget would show the new goal and quietly revert on the next reload.
+// Asking for the row back turns that silence into an error the caller rolls
+// back on.
 export async function updateWaterTarget(ounces: number): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in.');
-  const { error } = await supabase
+  const userId = await requireUserId();
+  const { data, error } = await supabase
     .from('profiles')
     .update({ target_water_oz: ounces })
-    .eq('id', user.id);
+    .eq('id', userId)
+    .select('target_water_oz');
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error('Could not save your water goal.');
 }

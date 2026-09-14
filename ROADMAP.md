@@ -128,6 +128,13 @@ A physical iPhone waits on the Apple membership, deferred by choice.)*
       goal line ported from the prototype, tap a day to see its entries, plus
       a simple "days logged in a row" streak (no prototype precedent for
       streaks specifically, so this is a first design — see BUILD_LOG)
+- [x] **Water write bug fixed 2026-09-13** (Danny: "the water doesnt work
+      well"). The goal wouldn't save and the count reset — one cause, and not a
+      water bug: every write in the app called `supabase.auth.getUser()` first,
+      which is a *network* round trip, so a stalled auth request meant the write
+      never happened, nothing threw, and the optimistic UI showed water that was
+      never saved. Now `requireUserId()` off the cached session. Details and the
+      reproduction in BUILD_LOG.
 - [x] Drinks — answered by Danny 2026-08-22 and built to that answer. Water is
       a *hydration* feature, not a calorie one: its own `water_log` table and a
       blue ounces widget on the day view, one tap = 8 oz, editable daily goal

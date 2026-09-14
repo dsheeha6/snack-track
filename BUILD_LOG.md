@@ -5,6 +5,71 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-13 (later still) — the silent-write bug behind "water doesn't work well"
+
+Danny reported two symptoms: **the daily water goal wouldn't save, and the count
+was wrong or reset.** They turned out to be one bug, and it was never about
+water — it sat under *every write in the app*.
+
+**The cause.** `addEntry`, `addEntries`, `addWater`, `updateWaterTarget` and
+`saveOnboarding` all began with `supabase.auth.getUser()` to get the id to stamp
+on the row. **`getUser()` is a network round trip** to `/auth/v1/user`. So every
+write depended on a second request that had nothing to do with the write — and
+if that request hung, the write was never attempted, **nothing threw**, and the
+optimistic UI went on showing food or water that had never been saved. The next
+reload silently took it away.
+
+**Proven, not theorised.** Stalling only `/auth/v1/user` in the running app and
+tapping "+ 8 oz" twice: the widget moved 8 → 24 oz, **zero inserts were sent**,
+no error appeared, and a reload put it back to 8. The goal edit behaved the same
+way — it showed the new number, wrote nothing, and reverted.
+
+**The fix** is `requireUserId()` in `lib/supabase.ts`, using `getSession()`,
+which reads the stored session and only touches the network when the token
+actually needs refreshing. All five call sites now use it. Re-running the same
+stalled-`getUser` test afterwards: both taps sent real inserts (201, 201),
+24 oz survived the reload, and there is no `/auth/v1/user` request at all.
+This also takes a network round trip off the front of every write.
+
+**Two smaller fixes on the same theme — a silent no-op must not look like
+success:**
+
+- `updateWaterTarget` now asks for the row back with `.select()`. PostgREST
+  answers an update that matched nothing with **204 and no error**, so a row
+  hidden by RLS or a mismatched id was indistinguishable from success. The
+  PATCH now returns 200 with the row, and zero rows raises. (Confirmed live:
+  the request went from 204 to 200.)
+- The goal's Save button no longer greys out when the typed value equals the
+  current goal. The field opens pre-filled, so the first thing anyone saw was a
+  disabled Save next to their own number — which reads as broken. Re-saving the
+  same value costs one request.
+
+**Also landed: the 5 `react-hooks/set-state-in-effect` lint errors are fixed,**
+and `npm run lint` now exits 0. That work came from the spun-off session, which
+was stopped when Danny asked for everything to happen in one place; it had
+edited the **shared checkout**, not an isolated worktree, so its changes were
+already in the tree. They were kept because the approach was right — key-based
+remounts instead of reset effects (`AddEntryModal` split into a thin modal plus
+`AddEntryForm`, `WaterSheet` remounted via a `sheetKey`), search state collapsed
+to one `{query, foods}` record with `results`/`searching` derived during render,
+`onboarded` stored against its user id, and `useSyncExternalStore` for the web
+hydration flag. **It had not verified any of it**; `tsc --noEmit` and
+`expo lint` were run here and both pass. Its predicted follow-on error from
+`setSearching` never appeared, because that state no longer exists.
+
+**Verified end to end afterwards**, since `entries.ts` changed too: typed "a
+banana and black coffee", got Banana (1 medium, estimated portion) and Black
+coffee (0 cal, correctly present rather than dropped), logged both, and the day
+moved to 105 calories. Throwaway accounts deleted; `auth.users`, `entries` and
+`water_log` all back to zero test rows.
+
+**Worth carrying forward:** `getUser()` is the wrong call for "who am I" on a
+write path — it is a network request wearing the costume of a local lookup.
+Reach for `getSession()`, and prefer `.select()` on any update whose success you
+intend to believe.
+
+---
+
 ## 2026-09-13 (later) — parse-meal wired into the app, and driven by hand
 
 Phase 4's other half. **Verified by using it, not by reading it**: the web
