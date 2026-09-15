@@ -22,15 +22,13 @@ export type ParsedMeal = {
   model: string;
 };
 
-// `none`, not `estimate`, and it's a measured choice rather than a default.
-// `estimate` runs a `foods` lookup per item to attach food_id — but `entries`
-// has no food_id column to put it in, so today it buys a database round trip
-// per item and nothing else. Worse, the 2026-09-13 eval showed single-best
-// resolution is currently unreliable on generic words (banana -> banana pepper,
-// wine -> red wine vinegar), so the link would be wrong as often as not.
-// Switch this to 'estimate' once search_foods has a resolution path that
-// prefers whole foods and returns nothing rather than a bad guess.
-const RESOLVE_MODE = 'none';
+// `estimate`: Claude's numbers stand, and a database match only attaches
+// provenance — it never changes a calorie or a macro. Both of the reasons this
+// was 'none' are now gone (2026-09-14): `entries` has a `food_id` column, and
+// resolution goes through `resolve_food`, which prefers whole foods and returns
+// nothing rather than a bad guess. Not `db` — that mode was measured on
+// 2026-09-13 and lost badly (protein error 16.3% -> 32.4%).
+const RESOLVE_MODE = 'estimate';
 
 /**
  * Send a sentence to the parse-meal edge function.

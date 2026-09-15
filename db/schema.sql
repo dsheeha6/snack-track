@@ -67,6 +67,7 @@ create table public.entries (
   fat numeric(6,1) not null default 0,
   source entry_source not null default 'manual',
   note text,
+  -- food_id is added after `foods` is created, below.
   created_at timestamptz not null default now()
 );
 create index entries_user_date_idx on public.entries (user_id, eaten_on desc);
@@ -95,6 +96,16 @@ alter table public.foods
   generated always as (name || ' ' || coalesce(brand, '')) stored;
 create index foods_search_trgm_idx
   on public.foods using gin (search_text extensions.gin_trgm_ops);
+
+-- Which catalogue row an entry was matched to, when resolve_food was confident.
+-- Declared here rather than on `entries` above only because `foods` has to exist
+-- first. Nullable forever: manual entries have no food row at all, resolve_food
+-- returns nothing whenever it is unsure, and an entry's own calories and macros
+-- never depend on this column — it is provenance, not arithmetic.
+-- on delete set null, not cascade: re-seeding `foods` must never delete a day of
+-- someone's food log.
+alter table public.entries
+  add column food_id uuid references public.foods (id) on delete set null;
 
 -- The moat: what each person's own words resolve to.
 create table public.personal_foods (
@@ -238,6 +249,190 @@ $$;
 revoke all on function public.search_foods(text, int) from public;
 revoke all on function public.search_foods(text, int) from anon;
 grant execute on function public.search_foods(text, int) to authenticated;
+
+-- ---------- single-best resolution, for the AI logging path ----------
+-- Deliberately NOT search_foods. That one is the app's search box, where recall
+-- is the point and a human picks from the list. This answers "which single row
+-- IS this food", and its answer gets stamped on the user's entry as food_id, so
+-- a wrong answer is worse than no answer. Taking search_foods' top hit was
+-- measurably unsafe (2026-09-14): 'apple' -> LAURA BETH'S MEDIUM PINEAPPLE
+-- SALSA, 'chicken' -> Fat, chicken (900 cal), 'banana' -> banana pepper,
+-- 'green beans' -> Soybeans, 'wine' -> red wine vinegar.
+--
+-- The rules, and the failure each one prevents:
+--   1. Word boundaries, not substrings. ILIKE '%apple%' matches inside
+--      'pineapple' and '%beans%' inside 'soybeans'.
+--   2. The head noun (last word of the query) must head the FOOD. USDA names are
+--      'Head, qualifier, qualifier', so 'chicken' must not reach 'Fat, chicken'.
+--      Two exceptions: restaurant rows are 'CHAIN, item' (allowed when the query
+--      named the chain), and 'Nuts,'/'Seeds,' genuinely hide the food's own name
+--      ('Nuts, almond butter').
+--   3. Whole foods are tried before branded ones, across both attempts.
+--   4. A branded row is only ever linked when its own name contains everything
+--      the user said AND a brand word appears in the query. Testing brand overlap
+--      alone fails badly, because brands are full of food words: CHICKEN OF THE
+--      SEA made 'chicken' resolve to SHRIMP, TURKEY HILL made 'turkey' resolve to
+--      MILK, WATER MAGIC made 'water' resolve to PINA COLADA.
+--
+-- Returning zero rows is a valid, intended answer. The app runs resolve:'estimate',
+-- where the numbers are Claude's either way, so a missing link costs nothing and
+-- a wrong link is a lie. 'almond milk', 'oatmeal', 'wine' and 'beer' all
+-- deliberately resolve to nothing rather than to something close-but-wrong.
+create or replace function public.resolve_food_once(stems text[], needle text, mode text)
+returns uuid
+language plpgsql
+stable
+set search_path = public, extensions
+as $fn$
+declare
+  v_all  text;
+  v_head text;
+  v_like text;
+  v_id   uuid;
+  v_cats text[] := array['nuts','seeds'];
+begin
+  if stems is null or cardinality(stems) = 0 then
+    return null;
+  end if;
+
+  select '^' || string_agg('(?=.*\y' || w || '(e?s)?\y)', '') from unnest(stems) as w into v_all;
+  v_head := '\y' || stems[cardinality(stems)] || '(e?s)?\y';
+  -- One ILIKE per word, built as text. This is the only form the trigram index
+  -- accelerates: ILIKE ALL(array) measured as an 813ms parallel seq scan over all
+  -- 407k rows, this as a 27ms index scan. Stems come from a split on [^a-z0-9]+,
+  -- so they are letters and digits only, and are quote_literal'd regardless.
+  select string_agg(format(' and g.search_text ilike %L', '%' || w || '%'), '')
+    from unnest(stems) as w into v_like;
+
+  if mode = 'whole' then
+    execute format($sql$
+      select g.id
+      from public.foods g
+      where g.brand is null and g.source = 'usda' and g.search_text ~* $1 %s
+        and (split_part(g.name, ',', 1) ~* $2
+             or (split_part(g.name, ',', 2) ~* $2
+                 and ((select bool_and($3 ~* ('\y' || w || '\y'))
+                         from unnest(regexp_split_to_array(lower(split_part(g.name, ',', 1)), '[^a-z0-9]+')) as w
+                        where length(w) >= 3)
+                      or lower(split_part(g.name, ',', 1)) = any($5::text[]))))
+      order by
+        (split_part(g.name, ',', 1) ~* $2) desc,
+        (select bool_or(g.name ~* ('\y' || d || '\y') and $3 !~* ('\y' || d || '\y'))
+           from unnest(array['meatless','imitation','substitute','dried','dehydrated',
+                             'powdered','babyfood','infant','yolk','leaves']) as d) asc,
+        cardinality(array(select w from unnest(regexp_split_to_array(lower(split_part(g.name, ',', 1)), '[^a-z0-9]+')) as w
+                          where length(w) >= 3)) asc,
+        (select count(*) filter (
+           where exists (select 1 from unnest($4::text[]) as t
+                         where w ~* ('\y' || t || '(e?s)?\y') or t ~* ('\y' || w || '\y'))
+         )::numeric / greatest(count(*), 1)
+         from unnest(regexp_split_to_array(lower(g.name), '[^a-z0-9]+')) as w
+         where length(w) >= 3) desc,
+        (g.name ~* '\y(raw|whole|plain|fresh|cooked)\y') desc,
+        length(g.name) asc
+      limit 1
+    $sql$, v_like)
+    into v_id using v_all, v_head, needle, stems, v_cats;
+  else
+    execute format($sql$
+      select g.id
+      from public.foods g
+      where g.brand is not null and g.search_text ~* $1 %s
+        and g.name ~* $1
+        and split_part(g.name, ',', 1) ~* $2
+        and exists (select 1 from unnest(regexp_split_to_array(lower(g.brand), '[^a-z0-9]+')) as b
+                    where length(b) >= 3 and $3 ~* ('\y' || b || '\y'))
+        and (select count(*) filter (
+               where exists (select 1 from unnest($4::text[]) as t
+                             where w ~* ('\y' || t || '(e?s)?\y') or t ~* ('\y' || w || '\y'))
+             )::numeric / greatest(count(*), 1)
+             from unnest(regexp_split_to_array(lower(g.name), '[^a-z0-9]+')) as w
+             where length(w) >= 3) >= 0.5
+      order by
+        cardinality(array(select w from unnest(regexp_split_to_array(lower(split_part(g.name, ',', 1)), '[^a-z0-9]+')) as w
+                          where length(w) >= 3)) asc,
+        length(g.name) asc
+      limit 1
+    $sql$, v_like)
+    into v_id using v_all, v_head, needle, stems;
+  end if;
+
+  return v_id;
+end;
+$fn$;
+
+create or replace function public.resolve_food(q text)
+returns setof public.foods
+language plpgsql
+stable
+set search_path = public, extensions
+as $fn$
+declare
+  v_stems  text[];
+  v_plain  text[];
+  v_needle text := lower(btrim(q));
+  v_id     uuid;
+begin
+  select array(select case when length(w) > 3 and w like '%s' and w not like '%ss'
+                           then left(w, length(w) - 1) else w end
+               from unnest(regexp_split_to_array(v_needle, '[^a-z0-9]+')) as w
+               where length(w) >= 3)
+    into v_stems;
+
+  if cardinality(v_stems) = 0 then
+    select array(select w from unnest(regexp_split_to_array(v_needle, '[^a-z0-9]+')) as w
+                 where length(w) >= 2)
+      into v_stems;
+  end if;
+
+  if cardinality(v_stems) = 0 then
+    return;
+  end if;
+
+  -- Claude's search_term carries the sentence's modifiers ('grilled chicken
+  -- breast', 'medium banana', 'large eggs'), and every word is required, so a
+  -- real food could miss its link purely because of an adjective. Only
+  -- PREPARATION and SIZE words are droppable, and that restriction is the whole
+  -- point: general backoff would turn 'almond milk' into 'milk' and link a dairy
+  -- row, which is the exact class of wrong answer this function exists to
+  -- prevent. 'grilled' cannot change what the food is; 'almond' can. 'hot' and
+  -- 'cold' are left out too -- dropping 'hot' from 'hot dog' leaves 'dog'.
+  select array(select w from unnest(v_stems) as w
+               where w <> all (array['grilled','roasted','baked','fried','steamed',
+                                     'boiled','scrambled','poached','homemade','grated',
+                                     'toasted','sliced','chopped','diced','shredded',
+                                     'cooked','large','small','medium','plain','fresh']))
+    into v_plain;
+  if cardinality(v_plain) = 0 or cardinality(v_plain) = cardinality(v_stems) then
+    v_plain := null;
+  end if;
+
+  -- whole foods win over branded ones across BOTH attempts, not within each
+  v_id := public.resolve_food_once(v_stems, v_needle, 'whole');
+  if v_id is null and v_plain is not null then
+    v_id := public.resolve_food_once(v_plain, v_needle, 'whole');
+  end if;
+  if v_id is null then
+    v_id := public.resolve_food_once(v_stems, v_needle, 'branded');
+  end if;
+  if v_id is null and v_plain is not null then
+    v_id := public.resolve_food_once(v_plain, v_needle, 'branded');
+  end if;
+
+  if v_id is null then
+    return;
+  end if;
+
+  return query select f.* from public.foods f where f.id = v_id;
+end;
+$fn$;
+
+revoke all on function public.resolve_food_once(text[], text, text) from public;
+revoke all on function public.resolve_food_once(text[], text, text) from anon;
+revoke all on function public.resolve_food(text) from public;
+revoke all on function public.resolve_food(text) from anon;
+grant execute on function public.resolve_food(text) to authenticated;
+grant execute on function public.resolve_food(text) to service_role;
 
 -- Shared food table: anyone signed in can read, nobody writes from a client.
 create policy "read foods" on public.foods

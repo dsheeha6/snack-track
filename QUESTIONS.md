@@ -8,21 +8,6 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
-### Set the ANTHROPIC_API_KEY secret on the edge function — 30 seconds, and it's the last thing blocking Phase 4
-The key is in `.env.local` (added 2026-09-13, verified a standard `sk-ant-api...`
-key, not an admin one). But `.env.local` is a *local* file — the deployed
-`parse-meal` function can't read it. Supabase function secrets are separate, and
-there is no MCP tool that sets them, so this one is genuinely yours.
-
-**What to do:** https://supabase.com/dashboard/project/grltvenoqmzhgkfasvlb/settings/functions
-→ Edge Functions → Secrets → add `ANTHROPIC_API_KEY` with the same value that's
-in `.env.local`. Then say so and the eval runs.
-
-Until it's set the function returns a plain-English 500 saying exactly this, so
-there's no mystery failure to debug.
-
-**Danny:**
-
 ### Goal-based nutrient tracking — scope it into its own phase, don't sneak it into 2
 From Danny's drinks answer: track more than the four macros (he named sugar), and
 have onboarding ask the user's goals, then recommend or show only what's relevant
@@ -68,6 +53,18 @@ so the hook this needs will already exist by the time this phase starts.
 ---
 
 ## ANSWERED
+
+### ANTHROPIC_API_KEY secret — set, and Phase 4 ran on it
+Danny set it the same day this was written (2026-09-13). It was listed as OPEN
+here until 2026-09-14 purely because nobody moved it: the eval had already run on
+that secret and reported Haiku beating the baseline (14.2% vs 19.8%), and the app
+had logged a real meal through the deployed function. Nothing was ever blocked.
+
+Worth keeping from it: the secret is a **function** secret, separate from
+`.env.local`, set at Project Settings -> Edge Functions -> Secrets. If it ever
+goes missing the function says so in plain English rather than 500ing, and it
+lists the visible env names — which is how the "saved as Snack-Track" mixup got
+diagnosed in one call.
 
 ### Anthropic API key — done 2026-09-13, and the model is Haiku
 Danny pasted a key into `.env.local` and chose the model himself: *"i would like

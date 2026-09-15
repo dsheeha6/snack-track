@@ -5,6 +5,160 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-14 — single-best food resolution, and the `food_id` link becoming trustworthy
+
+The last structural item in Phase 4's list: *"Fix single-best food resolution
+before the `food_id` link is trusted — prefer `source='usda'` for unbranded
+queries and return nothing rather than a bad guess."* Done, plus the column the
+link had nowhere to go into, and the client flipped from `resolve:'none'` to
+`resolve:'estimate'`.
+
+**There were two defects, not one.** The roadmap and yesterday's log both
+recorded this as a ranking problem — generic words hitting the 399k branded rows
+first. Pulling every resolution the 2026-09-13 `--resolve db` run actually made
+(92 items, saved in `evals/claude_db_results.json`) turned up a second and worse
+one:
+
+```
+Apple        -> LAURA BETH'S MEDIUM PINEAPPLE SALSA
+Green beans  -> Soybeans, green, cooked, boiled, drained, with salt
+```
+
+`search_foods` matches with `ILIKE '%apple%'`, which matches **inside words** —
+`apple` in *pine*`apple`, `beans` in *soy*`beans`. That is not a ranking problem
+and no amount of reordering fixes it. The same 92 rows also had `Oatmeal` →
+OATMEAL RAISIN SOFT COOKED COOKIES, `Turkey` → Ham turkey sliced, `Pizza` →
+PIZZA CHEESE CRUNCHERS, and `wine` → CIRIO RED WINE VINEGAR. **79 of 92 items
+"resolved", and a large share of those were wrong** — which is exactly why the
+client was shipping `resolve:'none'`.
+
+**`resolve_food(q)` is a new function, deliberately not a change to
+`search_foods`.** They answer different questions. Search is the app's search
+box: recall is the point, it returns 20 rows, and a human picks. Resolution
+answers "which single row IS this", nobody reviews the answer, and the id it
+returns gets stamped onto the user's entry. Changing `search_foods` would have
+meant regressing the hand-verified Phase 2 search UX to serve the AI path.
+
+**The four rules, and the failure each one prevents.** Every one of these came
+from a wrong answer observed in the data, not from theory:
+
+1. **Word boundaries.** Kills pineapple/soybeans.
+2. **The head noun must head the food.** USDA names are `Head, qualifier,
+   qualifier`, so the last word of the query has to appear in the first
+   comma-segment. Without it: `chicken` → `Fat, chicken` (900 cal), `eggs` →
+   `Bread, egg`, `milk` → `Crackers, milk`, `wine` → `Vinegar, red wine`.
+   Two exceptions, both from the data: restaurant rows are `CHAIN, item`
+   (allowed only when the query named the chain), and `Nuts,`/`Seeds,` genuinely
+   displace the food's own name (`Nuts, almond butter`).
+3. **Whole foods before branded, across both attempts.**
+4. **A branded row is linked only when its own name contains everything the user
+   said and a brand word appears in the query.**
+
+**Rule 4 took three tries, and the two failures are worth recording.** The first
+version tested only whether a brand word appeared in the query — which fails
+catastrophically, because *brands are full of food words*:
+
+```
+chicken       -> CHICKEN OF THE SEA  / SHRIMP
+turkey        -> TURKEY HILL         / MILK
+water         -> WATER MAGIC         / PINA COLADA
+peanut butter -> BETTER'N PEANUT BUTTER / BANANA
+```
+
+In each case the brand alone satisfied the food word and the name was free to be
+anything. The second version required the brand to contribute a word the *name*
+lacked, which still let `ALMOND JOY` answer `almond milk` with MILK CHOCOLATE
+(489 cal). What works is requiring the product's own name to carry every word the
+user said. **The cost is real and accepted:** `quest protein bar` no longer
+reaches a QUEST-branded row whose name is only "PROTEIN BAR".
+
+**Returning nothing is a feature, and it is the point.** Of 61 hand-checked
+terms, 8 now resolve to nothing — `almond milk`, `wine`, `beer`, `oatmeal`,
+`hot dog`, `big mac`, `mixed berries`, `sriracha` — where before every one of
+them got *something*. In the shipping `estimate` mode the numbers are Claude's
+either way, so **a missing link costs nothing and a wrong link is a lie.** That
+principle also settled the last design question: a modifier retry.
+
+**The modifier retry, and why it is not general backoff.** Claude's
+`search_term` carries the sentence's adjectives — `grilled chicken breast`,
+`medium banana`, `large eggs` — and every word is required, so real foods were
+missing a link purely because of a word like "grilled". The retry drops leading
+**preparation and size** words only. General backoff (drop any leading word) was
+rejected outright: it turns `almond milk` into `milk` and links a dairy row.
+"grilled" cannot change what the food is; "almond" can. `hot` and `cold` are
+excluded from the list for the same reason — dropping `hot` from `hot dog`
+leaves `dog`.
+
+**One rule was built, measured, and then cut back.** Allowing a long list of
+USDA category prefixes (`Beverages,`, `Snacks,`, `Candies,`, `Sauce,` …) with the
+head matched anywhere after it bought `Nuts, almond butter` and `Sauce, hot
+chile, sriracha` — and cost `almond milk` → **Candies, milk chocolate, with
+almonds (526 cal)**, `oatmeal` → QUAKER OATMEAL TO GO granola bars, `beer` →
+root beer, and `wine` → non-alcoholic wine, all of which had correctly returned
+nothing. Narrowed to `nuts` and `seeds` only, with the food required in the
+segment directly after the category. **One wrong link is worth more than several
+right ones here**, and `almond milk` landing on milk chocolate is precisely the
+failure this function exists to prevent.
+
+**Performance took four attempts and the fix was not in the rules.** First
+working version: **1,339ms** for `chicken breast`, which the edge function pays
+*once per item in the sentence*. The scoring was never the problem — the
+candidate scan is 27ms. What mattered:
+
+- A CTE referenced by both branches gets **materialised**, so the expensive
+  per-row scoring ran for all 2,160 candidates even when the whole-food branch
+  had already answered from 7 rows.
+- Computing the match patterns in a CTE makes them **join columns rather than
+  plan-time values**, and the planner then cannot push them into the trigram
+  index — that version measured **5.6s**. As PL/pgSQL locals they are query
+  parameters.
+- `search_text ILIKE ALL (array)` is **not indexable** (measured: parallel seq
+  scan over all 407k rows, 813ms), and neither is the lookahead regex on its own,
+  because pg_trgm cannot extract trigrams through `(?=...)`. **One ILIKE per
+  word is**, which is why the predicate is built as text. The stems come from a
+  split on `[^a-z0-9]+` so they can only ever be letters and digits, and they are
+  `quote_literal`'d regardless.
+
+Final: **44-54ms** including the retry, ~10ms when nothing matches.
+
+**`entries.food_id`** — `uuid references foods(id) on delete set null`, nullable
+forever. `on delete set null` rather than cascade on purpose: re-seeding `foods`
+must never delete a day of someone's food log. The macros on an entry never
+depend on it; it is provenance, not arithmetic.
+
+**Verified end to end against the deployed function**, not just in SQL — five
+sentences through `parse-meal` v12 with a real JWT, **10 of 13 items linked and
+every link correct**:
+
+```
+Eggs                   -> Egg, whole, raw, fresh
+Banana                 -> Bananas, raw
+Green beans            -> Beans, snap, green, raw
+Greek yogurt           -> Yogurt, Greek, plain, lowfat
+Almond butter          -> Nuts, almond butter, plain, with salt added
+Blueberries            -> Blueberries, raw
+Almond milk            -> (none)
+Oatmeal                -> (none)
+```
+
+Calories are Claude's throughout and unchanged by resolution — that is what
+`estimate` mode means. `tsc --noEmit` clean, `expo lint` exits 0.
+
+**Not done and deliberately so:** this was scored by hand against 61 terms, not
+by a metric. A `--resolve estimate` eval run would cost ~$0.11 and would move the
+calorie numbers not at all (estimate mode does not touch them), so it would be
+measuring the wrong thing. What is worth building, when the next item needs it,
+is a resolution-accuracy scorer over the search terms — which first requires
+`parse-meal` to return `search_term` in its response. It does not today.
+
+**Worth carrying forward:** `ILIKE '%x%'` is a substring match, not a word
+match, and in a 407k-row food table the difference is `apple` matching
+`PINEAPPLE SALSA`. And when a Postgres function is mysteriously slow, check
+whether the planner can still see your patterns as values — a CTE boundary is
+enough to turn a 27ms index scan into a 5.6s sequential one.
+
+---
+
 ## 2026-09-13 (later still) — the silent-write bug behind "water doesn't work well"
 
 Danny reported two symptoms: **the daily water goal wouldn't save, and the count

@@ -293,7 +293,7 @@ Deno.serve(async (req) => {
   const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
 
   // Resolve against `foods` using the caller's own JWT, so RLS and the
-  // authenticated-only grant on search_foods apply exactly as they do in the app.
+  // authenticated-only grant on resolve_food apply exactly as they do in the app.
   const items = [];
 
   for (const it of rawItems) {
@@ -314,10 +314,13 @@ Deno.serve(async (req) => {
           Deno.env.get("SUPABASE_ANON_KEY")!,
           { global: { headers: { Authorization: authHeader } } },
         );
-        const { data } = await supabase.rpc("search_foods", {
-          q: it.search_term,
-          lim: 1,
-        });
+        // resolve_food, not search_foods: search is built for recall and a
+        // human picking from a list, and its top hit is wrong often enough to
+        // be dangerous here (2026-09-14: 'apple' -> PINEAPPLE SALSA, 'chicken'
+        // -> Fat chicken, 'banana' -> banana pepper). resolve_food answers the
+        // different question "which single row IS this", prefers whole foods,
+        // and returns nothing when it is not confident.
+        const { data } = await supabase.rpc("resolve_food", { q: it.search_term });
         const hit = data?.[0];
         if (hit) {
           foodId = hit.id;

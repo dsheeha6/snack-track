@@ -204,9 +204,8 @@ a documented activity/goal formula there was anything to reverse-engineer.)*
       JSON; returns the prototype's `{items, totals}` shape. Hardened past
       `verify_jwt`, which by itself accepts the **anon key that ships in the app
       bundle** — the function reads the role claim and takes only
-      `authenticated` / `service_role`. **Written and deployed but not yet
-      executed**: it needs the `ANTHROPIC_API_KEY` *function secret*, which is
-      separate from `.env.local` and is Danny's to set (QUESTIONS.md).
+      `authenticated` / `service_role`. Danny set the `ANTHROPIC_API_KEY`
+      *function secret* the same day and it has been running on it since.
 - [x] `--pipeline claude` in `evals/run.py`, with `--model` and `--resolve`,
       calling the deployed function rather than a Python copy of the prompt.
       Reports tokens and dollars per run and per meal.
@@ -224,10 +223,25 @@ a documented activity/goal formula there was anything to reverse-engineer.)*
       first (`wine` → red wine *vinegar*, `banana` → banana *pepper*, `oatmeal`
       → oatmeal raisin *cookies*). **`estimate` is the shipping mode**: Claude's
       numbers, database only for the `food_id` link.
-- [ ] Fix single-best food resolution before the `food_id` link is trusted —
-      prefer `source='usda'` for unbranded queries and return nothing rather
-      than a bad guess. Linking a banana to a banana pepper is wrong even when
-      the numbers are unaffected.
+- [x] **Fix single-best food resolution** — done 2026-09-14. There were *two*
+      defects, not the one recorded here: the ranking, and `search_foods`
+      matching with `ILIKE '%apple%'`, which matches **inside** words (`apple`
+      in pine*apple* → PINEAPPLE SALSA, `beans` in soy*beans*). New
+      `resolve_food(q)` function, deliberately separate from `search_foods` so
+      the hand-verified search UX is untouched: word-boundary matching, the
+      query's head noun must head the food (no more `chicken` → `Fat, chicken`
+      at 900 cal), whole foods before branded, and a branded row only when its
+      own name carries every word the user said. **Returns nothing when unsure,
+      by design** — `almond milk`, `wine`, `oatmeal` and `beer` now resolve to
+      no link at all rather than to something close-but-wrong. 44-54ms.
+      Full reasoning, the three rejected versions of the brand rule, and the
+      four-attempt performance story in BUILD_LOG.
+- [x] `entries.food_id` and the client flipped to `resolve:'estimate'` —
+      2026-09-14. The column the link had nowhere to go into (nullable,
+      `on delete set null` so a re-seed of `foods` can never delete a food log),
+      and `RESOLVE_MODE` in `mobile/src/lib/parse-meal.ts` moved off `'none'`.
+      Verified against the deployed function: 10 of 13 items across five
+      sentences linked, every link correct, calories untouched by resolution.
 - [x] **Wire `parse-meal` into the app** — done 2026-09-13 and **driven by hand
       in the running app**, not just bundled. The sentence box is now the first
       thing in the add-food modal per PRODUCT.md ("typing a sentence is the
@@ -249,6 +263,9 @@ kept rows landed under lunch as `source='ai'` with the macro bars updating.
 Still open in this phase: follow-up questions, `personal_foods` corrections and
 `ai_usage` metering. Danny has not yet used it for a real day — that is what
 closes Phase 2's outstanding "done when" too.)*
+
+*(2026-09-14: resolution and the `food_id` link are now done too, so what
+remains in Phase 4 is the three items above and nothing structural.)*
 
 ---
 

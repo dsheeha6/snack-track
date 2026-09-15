@@ -12,10 +12,13 @@ export type Entry = {
   carbs: number;
   fat: number;
   source: 'manual' | 'ai' | 'database' | 'history' | 'suggestion';
+  /** Catalogue row this was matched to, when resolution was confident. Never affects the macros above. */
+  food_id: string | null;
   created_at: string;
 };
 
-const ENTRY_COLUMNS = 'id, eaten_on, meal, name, qty, calories, protein, carbs, fat, source, created_at';
+const ENTRY_COLUMNS =
+  'id, eaten_on, meal, name, qty, calories, protein, carbs, fat, source, food_id, created_at';
 
 export async function fetchEntries(eatenOn: string): Promise<Entry[]> {
   const { data, error } = await supabase
@@ -49,6 +52,7 @@ export type NewEntry = {
   carbs: number;
   fat: number;
   source: Entry['source'];
+  food_id?: string | null;
 };
 
 export async function addEntry(entry: NewEntry): Promise<Entry> {

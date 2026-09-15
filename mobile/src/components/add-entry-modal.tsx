@@ -127,6 +127,10 @@ function AddEntryForm({
           carbs: item.carbs,
           fat: item.fat,
           source: 'ai' as const,
+          // Provenance only. resolve_food returns nothing unless it is confident,
+          // so this is null more often than not, and the macros above are Claude's
+          // either way.
+          food_id: item.food_id,
         }))
       );
     } catch (e) {
