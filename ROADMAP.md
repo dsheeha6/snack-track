@@ -356,6 +356,56 @@ the thing Danny says already works.
 
 ---
 
+## The design pass (not scheduled)
+
+Also Danny's 2026-09-17 direction, also **not started by his call**. The app is
+currently a flat, tidy, template-shaped version of itself, and `PRODUCT.md` has
+always said that a flat rounded-rectangle version of this app is a *different
+product*. He's now given a much fuller reference set — Graza, the Australian
+peanut butter, **Doodle Jump**, and five named currents (analogue/handcrafted,
+doodle art, "toasty" logos, elemental folk, illustrative branding). It's written
+out in `PRODUCT.md` → The look, which is where design arguments get settled.
+
+What makes this real work rather than a colour swap, and why it keeps getting
+deferred: **React Native has no four-value `border-radius`**, so the wobble that
+carries the whole look in the prototype's CSS doesn't port. It needs SVG borders
+or nine-slice images, plus a real decision about the display typeface on device.
+Budget actual time. The existing porting note in `PRODUCT.md` stands.
+
+One constraint worth carrying in from the new references: the imperfection has
+to vary, or it reads as a texture rather than a hand — and none of it may cost
+legibility of the numbers.
+
+---
+
+## Retention, incentives, and the Duolingo question (not scheduled)
+
+Danny, 2026-09-17: design that draws people in, onboarding that sets them up
+properly, **creative incentives**, high retention and daily usage, low churn,
+heavy inspiration from **Duolingo**. **Not started.**
+
+The full position — what to take from Duolingo (onboarding that reaches value
+fast, a legible daily loop, character and humour, celebration that lands) and
+what to refuse (streak guilt, loss-framed notifications, leaderboards, a mascot
+that performs disappointment) — is in `PRODUCT.md` → "Getting people in, and
+keeping them". Read it before scoping anything here; the refusals are the
+product's differentiator, not taste.
+
+Where it already touches the plan:
+
+- **Phase 7** is the nearest scheduled work: notifications with quiet hours,
+  cancelled on log, timed to when someone actually eats. That is a retention
+  feature already, and it is the one most at risk of drifting into nagging.
+- **Onboarding exists** (Phase 3, eight screens) and has never been watched over
+  the shoulder of someone who isn't Danny. That observation is worth more than
+  any new mechanic and costs nothing but a TestFlight build (Phase 8).
+- **Incentives overlap `marketing/MARKETING.md`** — challenges and referrals are
+  the same idea seen from two sides. Scope them together.
+- **The one hard rule for any mechanic:** it has to work on someone coming back
+  after two weeks off. If it needs them to feel bad about the gap, it's out.
+
+---
+
 ## Phase 5 — Suggestions
 
 **Goal:** "what should I eat" on real data.

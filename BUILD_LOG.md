@@ -170,6 +170,36 @@ that should settle future arguments, and into ROADMAP.md as **Accuracy work
 `restaurant` tag but nothing like this meal, and the hard part of adding it is
 the ground truth, not the sentence. No code this session.
 
+### And two more directions, same session, also not started
+
+**The look, in much more detail.** Graza and the Australian peanut butter were
+already in `PRODUCT.md`; Danny added **Doodle Jump** — useful because it's a
+*product* doing this rather than a package, so it shows how the style behaves
+when it has to be tapped — plus five named currents: analogue/handcrafted,
+doodle art / conceptual sketch, "toasty" logos, elemental folk, and illustrative
+branding. All in `PRODUCT.md` → The look, with one constraint added that the
+references imply but don't say: **the imperfection has to vary or it reads as a
+texture rather than a hand**, and none of it may cost legibility of the numbers.
+ROADMAP.md gets a **design pass (not scheduled)** section repeating why this is
+real work — RN has no four-value `border-radius`, so the wobble doesn't port.
+
+**Retention, incentives, and Duolingo.** Danny wants design that draws people
+in, onboarding that sets them up, creative incentives, high usage, low churn,
+and a lot of inspiration from Duolingo. Recorded in `PRODUCT.md` as a new
+section, and the reason it's a section rather than a bullet is that it needs a
+line drawn through it: **take the craft, refuse the coercion.** Duolingo's
+onboarding-to-value speed, legible daily loop, character, and celebration are
+worth studying closely. Its streak anxiety, loss-framed notifications,
+leaderboards and disappointed mascot are already forbidden here by the
+no-judgement promise and the "not building" list, and a future session reading
+"take inspiration from Duolingo" next to "never guilt a broken streak" needs to
+know which wins. The test written down for any mechanic: **does it work on
+someone coming back after two weeks off?**
+
+Also flagged there: the eight-screen onboarding has never been watched over the
+shoulder of someone who isn't Danny, which is worth more than any new mechanic
+and costs only a TestFlight build.
+
 **Next run:** follow-up questions are what's left in Phase 4, and they need a
 design argument before code — every question is friction in the flow PRODUCT.md
 calls the primary one, and Danny's direction above makes that argument harder to

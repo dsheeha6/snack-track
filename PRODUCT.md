@@ -98,11 +98,74 @@ changes:
 - Meal plans, recipes as a content library, coaching, "programs"
 - Anything that ranks users against each other
 
+## Getting people in, and keeping them
+
+**Danny's direction, 2026-09-17, recorded ahead of the work.** What he's asking
+for: design good enough that it draws people in on sight, an onboarding that
+sets someone up properly, **creative incentives for using the app**, high
+retention and daily usage, low churn — and a lot of inspiration taken from
+**Duolingo**.
+
+Duolingo is the right thing to study and the wrong thing to copy wholesale, so
+here is the line, because a future decision will turn on it.
+
+**Take the craft.** Duolingo is the best in the world at several things this app
+genuinely needs: an onboarding that reaches the first real moment of value in
+under a minute; a loop so short and legible you always know what "done for
+today" means; a visual identity with a character and a sense of humour that
+makes a chore feel like a place you want to be; and celebration that lands —
+real, specific, generous acknowledgement when someone does the thing.
+
+**Refuse the coercion.** A large part of Duolingo's engagement machine runs on
+guilt: streak anxiety, loss-framed notifications, leaderboards and demotion,
+a mascot that performs disappointment. Every one of those is already forbidden
+here, not as a stylistic preference but as the product's whole differentiator —
+see No judgement above, and the "not building" list, which rules out ranking
+users against each other. **A calorie tracker that makes you feel bad is the
+default product on the App Store. That's what we're not.**
+
+The practical test for any retention idea, and it's a strict one: **does it work
+on someone who has just come back after two weeks off?** If the mechanic needs
+them to feel bad about the gap to function, it's out. If it makes coming back
+feel easy and worth it, it's in. Streaks are already built and stay — a streak
+that counts up quietly is fine; a streak that guilts you when it breaks is not.
+
+Incentives specifically are unscoped and Danny's call. Two notes for whoever
+scopes them: the honest ones here reward *logging*, not weight change or eating
+"well", because the app doesn't rank food or people. And anything with a
+referral or challenge shape overlaps `marketing/MARKETING.md`, so scope the two
+together rather than inventing a second version of the same idea.
+
 ## The look
 
 Hand-drawn, bright, slightly off. It should feel like a good food brand — Graza,
 the oat milk cartons, the Australian peanut butter — not like a medical device or
 a fitness app. Warm, a bit silly, clearly made by a person.
+
+**Danny's fuller reference set, 2026-09-17.** Same direction, said with more
+precision, and worth having in the room when the design pass finally happens.
+Graza, the Australian peanut butter, and **Doodle Jump** — that last one matters
+because it's a *product* doing this, not a package, so it shows how the look
+behaves when it has to be tapped rather than picked up off a shelf. Plus five
+named currents, all of which are the same instinct from different angles:
+
+- **Analogue / handcrafted** — real mark-making. Charcoal, visible texture, raw
+  imperfection left in rather than cleaned up.
+- **Doodle art / conceptual sketch** — spontaneous lines, naive freeform shapes,
+  unpolished energy. Childlike, not childish.
+- **"Toasty" logos** — soft edges, hand-touched quirks, rounded type, earthy
+  comforting colour. The stated goal is that it feels like a warm handshake,
+  which is a good test for a calorie tracker specifically.
+- **Elemental folk** — hand-drawn flora and fauna, folk iconography, rustic
+  artisanal typography.
+- **Illustrative branding** — custom icons, characters and lettering woven into
+  one identity that tells a story, rather than decoration applied on top.
+
+The through-line, and the thing to hold onto when picking between them: **the
+imperfection has to be real, not a filter.** A wobble applied uniformly by code
+reads as a texture; a wobble that's different every time reads as a hand. And
+none of it is allowed to make a number harder to read — this is an app someone
+checks at a restaurant table.
 
 Taken from the working prototype (`../calorie-tracker/index.html`), which is the
 reference implementation:
