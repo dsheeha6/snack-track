@@ -9,6 +9,7 @@ import type { NewEntry } from '@/lib/entries';
 import { searchFoods, type Food } from '@/lib/foods';
 import { MEAL_COLORS, MEAL_LABELS, MEAL_SLOTS, type MealSlot } from '@/lib/meals';
 import { confidenceNote, parseMeal, type ParsedItem } from '@/lib/parse-meal';
+import { rememberFood, touchPersonalFood } from '@/lib/personal-foods';
 
 type AddEntryModalProps = {
   visible: boolean;
@@ -22,6 +23,16 @@ type AddEntryModalProps = {
 type Field = 'name' | 'qty' | 'calories' | 'protein' | 'carbs' | 'fat';
 
 const EMPTY_FORM = { name: '', qty: '', calories: '', protein: '', carbs: '', fat: '' };
+
+/**
+ * A parsed item plus whether the user has fixed it in this review.
+ *
+ * `edited` is what turns a row into a remembered correction when the meal is
+ * logged, so it has to survive the row being re-rendered and cannot be inferred
+ * by comparing numbers — someone re-typing 210 over 210 has still told us that
+ * 210 is right.
+ */
+type ReviewItem = ParsedItem & { edited: boolean };
 
 export function AddEntryModal({ visible, ...formProps }: AddEntryModalProps) {
   // Every open starts from a blank form, and that reset is a remount rather
@@ -60,8 +71,10 @@ function AddEntryForm({
   const [meal, setMeal] = useState<MealSlot>(defaultMeal);
   const [sentence, setSentence] = useState('');
   const [parsing, setParsing] = useState(false);
-  const [parsed, setParsed] = useState<ParsedItem[] | null>(null);
+  const [parsed, setParsed] = useState<ReviewItem[] | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState(EMPTY_FORM);
   const [query, setQuery] = useState('');
   // Results are kept next to the query they came back for. Everything else --
   // whether the list on screen is still current, whether a search is
@@ -103,7 +116,7 @@ function AddEntryForm({
     setParseError(null);
     try {
       const result = await parseMeal(sentence, meal);
-      setParsed(result.items);
+      setParsed(result.items.map((item) => ({ ...item, edited: false })));
     } catch (e) {
       setParseError(e instanceof Error ? e.message : 'Could not read that one.');
     } finally {
@@ -111,13 +124,56 @@ function AddEntryForm({
     }
   };
 
+  const startEdit = (index: number) => {
+    const item = parsed?.[index];
+    if (!item) return;
+    setEditingIndex(index);
+    setDraft({
+      name: item.name,
+      qty: item.qty,
+      calories: String(item.calories),
+      protein: String(item.protein),
+      carbs: String(item.carbs),
+      fat: String(item.fat),
+    });
+  };
+
+  const commitEdit = () => {
+    if (editingIndex === null || !parsed) return;
+    const name = draft.name.trim();
+    if (!name) return;
+    setParsed(
+      parsed.map((item, i) =>
+        i === editingIndex
+          ? {
+              ...item,
+              name,
+              qty: draft.qty.trim(),
+              calories: toNumber(draft.calories),
+              protein: toNumber(draft.protein),
+              carbs: toNumber(draft.carbs),
+              fat: toNumber(draft.fat),
+              // Their numbers now. Not an estimate, so it stops being described
+              // as one — see confidenceNote.
+              source: 'personal' as const,
+              confidence: 'high' as const,
+              note: '',
+              edited: true,
+            }
+          : item
+      )
+    );
+    setEditingIndex(null);
+  };
+
   const handleLogParsed = async () => {
     if (!parsed || parsed.length === 0 || saving) return;
     setSaving(true);
     setError(null);
+    const items = parsed;
     try {
       await onSaveMany(
-        parsed.map((item) => ({
+        items.map((item) => ({
           eaten_on: eatenOn,
           meal,
           name: item.name,
@@ -126,7 +182,11 @@ function AddEntryForm({
           protein: item.protein,
           carbs: item.carbs,
           fat: item.fat,
-          source: 'ai' as const,
+          // Where the numbers on this row actually came from, which after a
+          // correction is no longer the parser: a row the user just typed over
+          // is `manual`, and one that arrived already carrying their stored
+          // correction is `history`.
+          source: item.edited ? 'manual' : item.source === 'personal' ? 'history' : 'ai',
           // Provenance only. resolve_food returns nothing unless it is confident,
           // so this is null more often than not, and the macros above are Claude's
           // either way.
@@ -136,7 +196,13 @@ function AddEntryForm({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save those.');
       setSaving(false);
+      return;
     }
+    // Only after the food is safely logged, and never awaited: remembering a
+    // correction is a nicety for next time, and the user is already watching
+    // this sheet close. A failure here must not surface as an error on a meal
+    // that saved fine.
+    void rememberCorrections(items);
   };
 
   const pickFood = (food: Food) => {
@@ -223,24 +289,93 @@ function AddEntryForm({
               <>
                 <ThemedView type="backgroundElement" style={styles.form}>
                   <ThemedText type="small" themeColor="textSecondary">
-                    Here&apos;s what I got
+                    Here&apos;s what I got — tap anything to fix it
                   </ThemedText>
 
                   {parsed.map((item, index) => {
                     const note = confidenceNote(item);
+
+                    if (editingIndex === index) {
+                      return (
+                        <View key={`edit-${index}`} style={styles.editBox}>
+                          <TextInput
+                            value={draft.name}
+                            onChangeText={(v) => setDraft((d) => ({ ...d, name: v }))}
+                            placeholder="What is it?"
+                            placeholderTextColor="#9098a3"
+                            style={styles.input}
+                          />
+                          <TextInput
+                            value={draft.qty}
+                            onChangeText={(v) => setDraft((d) => ({ ...d, qty: v }))}
+                            placeholder="How much? (e.g. 1 scoop)"
+                            placeholderTextColor="#9098a3"
+                            style={styles.input}
+                          />
+                          <View style={styles.macroRow}>
+                            <NumberField
+                              label="cal"
+                              value={draft.calories}
+                              onChangeText={(v) => setDraft((d) => ({ ...d, calories: v }))}
+                            />
+                            <NumberField
+                              label="P"
+                              value={draft.protein}
+                              onChangeText={(v) => setDraft((d) => ({ ...d, protein: v }))}
+                            />
+                            <NumberField
+                              label="C"
+                              value={draft.carbs}
+                              onChangeText={(v) => setDraft((d) => ({ ...d, carbs: v }))}
+                            />
+                            <NumberField
+                              label="F"
+                              value={draft.fat}
+                              onChangeText={(v) => setDraft((d) => ({ ...d, fat: v }))}
+                            />
+                          </View>
+                          {/* Said once, at the moment it's true, and never again:
+                              the promise is that fixing this is worth the ten
+                              seconds because it sticks. */}
+                          <ThemedText type="small" themeColor="textSecondary">
+                            I&apos;ll use these numbers next time too
+                          </ThemedText>
+                          <View style={styles.editActions}>
+                            <Pressable onPress={() => setEditingIndex(null)} hitSlop={8}>
+                              <ThemedText type="small" themeColor="textSecondary">
+                                Cancel
+                              </ThemedText>
+                            </Pressable>
+                            <Pressable onPress={commitEdit} hitSlop={8}>
+                              <ThemedText type="linkPrimary">Done</ThemedText>
+                            </Pressable>
+                          </View>
+                        </View>
+                      );
+                    }
+
                     return (
                       <View key={`${item.name}-${index}`} style={styles.parsedRow}>
-                        <View style={styles.parsedMain}>
+                        <Pressable
+                          style={styles.parsedMain}
+                          onPress={() => startEdit(index)}
+                          accessibilityLabel={`Edit ${item.name}`}
+                        >
                           <ThemedText>{item.name}</ThemedText>
                           <ThemedText type="small" themeColor="textSecondary">
                             {[item.qty, note].filter(Boolean).join(' · ')}
                           </ThemedText>
-                        </View>
-                        <ThemedText type="small" themeColor="textSecondary">
-                          {Math.round(item.calories)} cal
-                        </ThemedText>
+                        </Pressable>
+                        <Pressable onPress={() => startEdit(index)} hitSlop={8}>
+                          <ThemedText type="small" themeColor="textSecondary">
+                            {Math.round(item.calories)} cal
+                          </ThemedText>
+                        </Pressable>
                         <Pressable
-                          onPress={() => setParsed(parsed.filter((_, i) => i !== index))}
+                          onPress={() => {
+                            setEditingIndex(null);
+                            setParsed(parsed.filter((_, i) => i !== index));
+                          }}
                           hitSlop={10}
                           accessibilityLabel={`Remove ${item.name}`}
                         >
@@ -265,8 +400,15 @@ function AddEntryForm({
 
                 <Pressable
                   onPress={handleLogParsed}
-                  disabled={saving}
-                  style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+                  // Editing blocks the log button on purpose: a half-typed
+                  // correction that vanished because the user reached for the
+                  // green button instead of "Done" would lose the one number
+                  // they cared enough to fix.
+                  disabled={saving || editingIndex !== null}
+                  style={[
+                    styles.saveButton,
+                    (saving || editingIndex !== null) && styles.saveButtonDisabled,
+                  ]}
                 >
                   {saving ? (
                     <ActivityIndicator color="#ffffff" />
@@ -277,7 +419,14 @@ function AddEntryForm({
                   )}
                 </Pressable>
 
-                <Pressable onPress={() => setParsed(null)} style={styles.startOver} hitSlop={8}>
+                <Pressable
+                  onPress={() => {
+                    setEditingIndex(null);
+                    setParsed(null);
+                  }}
+                  style={styles.startOver}
+                  hitSlop={8}
+                >
                   <ThemedText type="linkPrimary">Type it again</ThemedText>
                 </Pressable>
               </>
@@ -421,6 +570,41 @@ function NumberField({
   );
 }
 
+/**
+ * Store what the user fixed, and count what they reused.
+ *
+ * Both halves matter. The edits are the corrections themselves; the untouched
+ * rows that arrived as `personal` are a stored correction being used again,
+ * which is what `times_used` will rank on when favourites and "same as
+ * yesterday" get built.
+ *
+ * Note `item.phrase` is the name the *parser* produced, captured before any
+ * edit, while `item.name` is whatever the user renamed it to. That is the point:
+ * the rule being stored is "when the parser says this, use my numbers", so
+ * renaming "Protein bar" to "My bar" must not file the correction under a phrase
+ * the parser will never say again.
+ */
+async function rememberCorrections(items: ReviewItem[]): Promise<void> {
+  for (const item of items) {
+    try {
+      if (item.edited) {
+        await rememberFood(item.phrase, {
+          name: item.name,
+          qty: item.qty || null,
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fat: item.fat,
+        });
+      } else if (item.source === 'personal') {
+        await touchPersonalFood(item.phrase);
+      }
+    } catch {
+      // Nothing to tell the user: their food is logged either way.
+    }
+  }
+}
+
 function toNumber(value: string): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -490,6 +674,18 @@ const styles = StyleSheet.create({
   parsedMain: {
     flex: 1,
     gap: 2,
+  },
+  editBox: {
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E1B1614',
+  },
+  editActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: Spacing.four,
   },
   remove: {
     fontSize: 22,

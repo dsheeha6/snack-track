@@ -28,6 +28,14 @@ prototype.
 is simple, easy, and doesn't judge anyone. That's the differentiator, not a slogan —
 it decides what gets built and what gets refused.
 
+**Marketing is tracked in `marketing/MARKETING.md`, not here.** This file is what
+gets built; that one is what gets said. Danny's plan as of 2026-09-17: 90-day
+eating/fitness challenges with his own daily meal tracking as the long-term
+content, heavy organic and word of mouth, **paid ads only after consistent
+monthly profit**. The daily-tracking content can start now — it's the same
+activity as Phase 2's outstanding "done when". Telling people to *download* it
+waits on Phase 8, and converting them waits on Phase 6.
+
 Plan behind all of this: https://claude.ai/code/artifact/098c2efa-faa4-4f9c-a5e4-d4783dc9b4c9
 Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny uses it daily)
 
@@ -250,8 +258,25 @@ a documented activity/goal formula there was anything to reverse-engineer.)*
       button logs the lot as `source='ai'`. Also wired into onboarding's last
       step, so the first thing a new user is shown is the primary interaction.
 - [ ] Follow-up questions: high-variance foods only, capped at two
-- [ ] Corrections captured into `personal_foods`
-- [ ] Token metering into `ai_usage`
+- [x] **Corrections captured into `personal_foods`** — done 2026-09-17. The
+      review list is editable: tap any row, fix the name, amount or numbers, and
+      the fix is stored against *the name the parser produced* (not the sentence,
+      so "2 eggz" and "some eggs" share one correction) via a new
+      `remember_food` function. Every later parse of that food comes back
+      carrying the user's own numbers, scaled by amount, labelled "your
+      numbers" instead of "estimated portion". A stored correction that can't be
+      scaled honestly — "1 scoop" against "a cup" — is declined rather than
+      guessed at, the same principle as `resolve_food` returning nothing.
+      Logged entries now record where the numbers came from: `manual` for a row
+      just corrected, `history` for one that arrived carrying a stored
+      correction, `ai` for the parser's own.
+- [x] **Token metering into `ai_usage`** — done 2026-09-17. The edge function
+      writes the row itself with the service_role key, because a client that
+      reports its own usage is a client that can decline to, and Phase 6's free
+      tier (5 AI logs/week) has to count something unforgeable. Verified in the
+      running app: three parses, three rows, token counts matching what the
+      function reported, and a hand-rolled insert from a signed-in client
+      refused by RLS. Eval runs are deliberately not metered.
 
 **Done when:** the harness reports the Claude pipeline beating the prototype's
 baseline on the 50-meal set, and Danny can log a day by typing sentences.
@@ -266,6 +291,11 @@ closes Phase 2's outstanding "done when" too.)*
 
 *(2026-09-14: resolution and the `food_id` link are now done too, so what
 remains in Phase 4 is the three items above and nothing structural.)*
+
+*(2026-09-17: corrections and metering are both done and both driven by hand in
+the running app. **Follow-up questions are the only Phase 4 item left**, and
+they are the one that has to argue with PRODUCT.md's "easy" promise before
+they're built — every question is friction in the primary flow.)*
 
 ---
 
@@ -320,5 +350,7 @@ he's already logged.
 - [ ] Icon, screenshots, listing copy
 - [ ] TestFlight with a handful of real people
 - [ ] Submit
+- [ ] Launch content ready to go — see `marketing/MARKETING.md`. The first 90-day
+      challenge can't ask anyone to install until this phase is done.
 
 **Done when:** it's live and someone who isn't Danny has installed it.

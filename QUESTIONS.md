@@ -8,6 +8,19 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
+### One dashboard toggle: leaked-password protection (30 seconds, yours to click)
+The Supabase security advisor is clean except for this one, and it's been there
+since email+password sign-in went in: **Authentication → Policies → "Leaked
+password protection"** is off. On, it checks a new password against
+HaveIBeenPwned so nobody signs up with a password that's already in a breach
+dump. No code, no migration, no downside — it only ever rejects passwords that
+are already public.
+
+Not urgent while the only accounts are yours and mine, genuinely worth having
+before anyone else installs it (Phase 8).
+
+**Danny:**
+
 ### Goal-based nutrient tracking — scope it into its own phase, don't sneak it into 2
 From Danny's drinks answer: track more than the four macros (he named sugar), and
 have onboarding ask the user's goals, then recommend or show only what's relevant

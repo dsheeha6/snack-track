@@ -1,4 +1,5 @@
 import type { MealSlot } from '@/lib/meals';
+import { fetchPersonalFoods, phraseKey, servingsOf } from '@/lib/personal-foods';
 import { supabase } from '@/lib/supabase';
 
 export type ParsedItem = {
@@ -8,11 +9,14 @@ export type ParsedItem = {
   protein: number;
   carbs: number;
   fat: number;
-  source: 'estimate' | 'database';
+  /** `personal` — these are the user's own corrected numbers, not an estimate. */
+  source: 'estimate' | 'database' | 'personal';
   confidence: 'high' | 'medium' | 'low';
   food_id: string | null;
   matched_name: string | null;
   note: string;
+  /** Key this item is remembered under, so a correction lands on the right row. */
+  phrase: string;
 };
 
 export type ParsedMeal = {
@@ -63,7 +67,60 @@ export async function parseMeal(text: string, meal: MealSlot): Promise<ParsedMea
     throw new Error("Couldn't pick any food out of that one. Try naming it plainly, or add it below.");
   }
 
-  return data;
+  return applyCorrections(data);
+}
+
+/**
+ * Replace the parser's numbers with the user's own, for any food they've
+ * already corrected.
+ *
+ * Deliberately client-side rather than inside the edge function. The function
+ * holds the API key and answers "what is this food, roughly"; whose numbers win
+ * afterwards is the app's business, it needs no extra round trip inside a call
+ * the user is waiting on, and a correction that fails to load leaves a working
+ * parse rather than a failed one.
+ */
+async function applyCorrections(meal: ParsedMeal): Promise<ParsedMeal> {
+  const items = meal.items.map((item) => ({ ...item, phrase: phraseKey(item.name) }));
+  const stored = await fetchPersonalFoods(items.map((i) => i.phrase));
+  if (stored.size === 0) return { ...meal, items };
+
+  const corrected = items.map((item) => {
+    const mine = stored.get(item.phrase);
+    if (!mine) return item;
+
+    const servings = servingsOf(mine.qty, item.qty);
+    if (servings === null) return item;
+
+    return {
+      ...item,
+      name: mine.name,
+      calories: round1(Number(mine.calories) * servings),
+      protein: round1(Number(mine.protein) * servings),
+      carbs: round1(Number(mine.carbs) * servings),
+      fat: round1(Number(mine.fat) * servings),
+      source: 'personal' as const,
+      // It's their own number. Nothing about it is an estimate any more, so the
+      // "estimated portion" note would be both wrong and faintly insulting.
+      confidence: 'high' as const,
+      note: '',
+    };
+  });
+
+  return {
+    ...meal,
+    items: corrected,
+    totals: {
+      calories: round1(corrected.reduce((s, i) => s + i.calories, 0)),
+      protein: round1(corrected.reduce((s, i) => s + i.protein, 0)),
+      carbs: round1(corrected.reduce((s, i) => s + i.carbs, 0)),
+      fat: round1(corrected.reduce((s, i) => s + i.fat, 0)),
+    },
+  };
+}
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
 }
 
 /**
@@ -75,6 +132,7 @@ export async function parseMeal(text: string, meal: MealSlot): Promise<ParsedMea
  * to read on a day someone already feels bad.
  */
 export function confidenceNote(item: ParsedItem): string | null {
+  if (item.source === 'personal') return 'your numbers';
   if (item.confidence === 'high') return null;
   if (item.confidence === 'medium') return 'estimated portion';
   return 'rough estimate';

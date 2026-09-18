@@ -144,16 +144,65 @@ function round1(n: number) {
 // verify_jwt alone leaves this endpoint open to anyone who unzips the APK. Read
 // the role claim and require a real session. No signature check here on purpose:
 // the platform already did it before this code ran.
-function callerRole(authHeader: string): string | null {
+function callerClaims(authHeader: string): { role: string | null; sub: string | null } {
   const token = authHeader.replace(/^Bearer\s+/i, "");
   const payload = token.split(".")[1];
-  if (!payload) return null;
+  if (!payload) return { role: null, sub: null };
   try {
     const pad = payload.replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(atob(pad + "=".repeat((4 - (pad.length % 4)) % 4))).role ?? null;
+    const claims = JSON.parse(atob(pad + "=".repeat((4 - (pad.length % 4)) % 4)));
+    return { role: claims.role ?? null, sub: claims.sub ?? null };
   } catch {
-    return null;
+    return { role: null, sub: null };
   }
+}
+
+// Record what the call cost, in tokens, against the user who made it.
+//
+// Written here rather than from the client for the same reason the API key is
+// here: a client that reports its own usage is a client that can decline to.
+// `ai_usage` is deliberately read-only to its owner (db/schema.sql) and the
+// service_role key bypasses that, which is exactly the split we want —
+// Phase 6's free-tier limits (5 AI logs/week) will count these rows, so they
+// have to be unforgeable.
+//
+// Three deliberate choices:
+//   - It never fails the request. A meal that parsed correctly must still be
+//     returned if the metering insert breaks; the user's food is not hostage
+//     to our accounting.
+//   - Eval runs are not metered. The harness calls with the service_role key,
+//     which has no `sub` — those tokens are Danny's testing, not a user's quota.
+//   - It runs after the response is built, via waitUntil where the runtime
+//     offers it, so metering never shows up as latency in the add-food modal.
+function meterUsage(
+  sub: string | null,
+  role: string | null,
+  model: string,
+  usage: { input_tokens: number; output_tokens: number },
+) {
+  if (role !== "authenticated" || !sub) return;
+
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!serviceKey) return;
+
+  const write = (async () => {
+    try {
+      const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+      await admin.from("ai_usage").insert({
+        user_id: sub,
+        kind: "parse",
+        model,
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+      });
+    } catch {
+      // Accounting is not worth a failed meal. Swallow it.
+    }
+  })();
+
+  const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } })
+    .EdgeRuntime;
+  if (typeof runtime?.waitUntil === "function") runtime.waitUntil(write);
 }
 
 Deno.serve(async (req) => {
@@ -167,7 +216,7 @@ Deno.serve(async (req) => {
   }
 
   const authHeader = req.headers.get("Authorization") ?? "";
-  const role = callerRole(authHeader);
+  const { role, sub } = callerClaims(authHeader);
   if (role !== "authenticated" && role !== "service_role") {
     // 'anon' lands here, which is the point.
     return json({ error: "Sign in to use this." }, 401, origin);
@@ -363,6 +412,8 @@ Deno.serve(async (req) => {
   const totals = Object.fromEntries(
     MACROS.map((k) => [k, round1(items.reduce((s, i) => s + (i[k] as number), 0))]),
   );
+
+  meterUsage(sub, role, model, response.usage);
 
   return json(
     {

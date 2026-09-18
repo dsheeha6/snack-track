@@ -5,6 +5,158 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-17 — corrections that stick, metering that can't be forged, and a marketing folder
+
+Two of Phase 4's three remaining items, both built and both driven by hand in
+the running app against a throwaway account. The third — follow-up questions —
+is untouched on purpose and is now the only thing left in the phase.
+
+### Token metering into `ai_usage`
+
+The row is written **by the edge function, with the service_role key**, not by
+the client. That is the whole design decision: a client that reports its own
+usage is a client that can decline to, and Phase 6 enforces a free tier of 5 AI
+logs a week off exactly these rows. `ai_usage` was already RLS'd read-only to
+its owner (`db/schema.sql`), so the split was waiting to be used.
+
+Three choices worth keeping:
+
+- **It never fails the request.** A meal that parsed correctly is still returned
+  if the insert breaks. The user's food is not hostage to our accounting.
+- **Eval runs are not metered.** The harness authenticates with the
+  service_role key, which carries no `sub` claim — `meterUsage` returns early on
+  anything that isn't a real `authenticated` session. Danny's testing shouldn't
+  eat a user's quota, and a `user_id` invented for it would be a lie.
+- **It runs through `EdgeRuntime.waitUntil`**, after the response is built, so
+  metering is never latency in the add-food modal. That is also a testing trap:
+  the first verification script read `ai_usage` the instant the parse returned,
+  got zero rows, and reported a failure that wasn't one — the row landed a
+  moment later. The check polls now.
+
+`callerRole()` became `callerClaims()` and returns `sub` alongside `role`; the
+parse path is otherwise untouched. Deployed as **parse-meal v13**.
+
+Verified against the deployed function with a real signed-in JWT: three parses
+from the app produced three rows with token counts matching what the function
+reported (1356/150, 1359/148, 1359/207), the owner can read their own rows and
+only their own, and a hand-rolled insert from a signed-in client is refused —
+`42501 new row violates row-level security policy`.
+
+### Corrections into `personal_foods`
+
+**The review list is now editable.** Tap any row in "here's what I got", fix the
+name, the amount or any of the four numbers, and on logging that fix is stored
+and reused forever after.
+
+**The key is the name the parser produced, not what the user typed.** This is
+the one decision everything else follows from. "2 eggz", "some eggs" and "eggs
+on toast" are three sentences and one food, and Claude normalises all three to
+`Eggs` before the app sees them — so keying corrections on raw sentence text
+would learn a fix for one phrasing and forget it the moment someone typed the
+same meal slightly differently. `phraseKey()` in the client and
+`regexp_replace(btrim(lower(...)), '\s+', ' ')` in SQL are the same
+normalisation on both sides.
+
+A corollary that took a moment to see: when someone renames a row, the stored
+`phrase` stays the *parser's* name while `name` becomes theirs. The rule being
+stored is "when the parser says this, use my numbers" — filing it under "My bar"
+would file it under a phrase the parser will never say again.
+
+**Two SQL functions** (migration `add_personal_food_corrections`):
+`remember_food` upserts on `(user_id, phrase)` and increments `times_used` in
+the same statement, which an upsert from the client cannot do; and
+`touch_personal_food`, because *using* a correction changes no values but is
+still a use — `times_used` is what Phase 5's favourites and "same as yesterday"
+will rank on, so it has to count uses, not just edits. Both are security
+invoker: RLS does the access control exactly as it would for a direct insert.
+
+**Where the override is applied: the client, after the parse returns.** The
+edge function holds the API key and answers "what is this food, roughly"; whose
+numbers win afterwards is the app's business. Doing it client-side means no
+extra round trip inside a call the user is waiting on, and a correction that
+fails to load leaves a working parse instead of a failed one.
+
+**The amount rule, and the bug the live run caught.** A correction of "1 scoop =
+210 cal" has to survive being asked about two scoops. `servingsOf()` scales when
+it honestly can — same unit, plurals folded, fractions and mixed numbers ("1 1/2
+cups") parsed — and returns **null** when it can't, which leaves the parser's
+numbers alone rather than putting a wrong figure on someone's day under the
+label "your numbers".
+
+The first version was too strict, and no amount of unit-testing would have found
+it because the input came from Claude rather than from my imagination. Typing
+*"2 protein shakes"* returns a qty of exactly `2` — no unit — which against a
+stored "1 scoop" read as a unit mismatch, so the correction was stored, matched,
+and then **silently declined**. In the app it looked like the feature simply
+didn't work. Fixed by reading a bare number in the other side's unit: `2`
+against "1 scoop" is two scoops, `2` against "3 large" is two of the recorded
+three. Only a disagreement between two *named* units gives up now. 22 cases
+pinned in a throwaway harness afterwards.
+
+**Entry provenance now distinguishes three things** where it used to say `ai`
+for everything from the sentence box: a row the user just typed over is
+`manual`, one that arrived already carrying their stored correction is
+`history`, and the parser's own is `ai`. The `source` enum already had all
+three.
+
+**Copy, checked against PRODUCT.md:** the list header is now "Here's what I got
+— tap anything to fix it", an edited row reads "your numbers" where it used to
+read "estimated portion", and the edit box says "I'll use these numbers next
+time too" — said once, at the moment it's true, so that fixing a number feels
+like it buys something. Nothing anywhere says the user got it wrong. The green
+log button is disabled while a row is open for editing, so a half-typed
+correction can't vanish because someone reached for the wrong button.
+
+### Verified by hand, in the app
+
+Signed in as a throwaway account seeded with Danny's targets (2,878 / 180 / 360
+/ 80), on the web build:
+
+1. *"my protein shake and a banana"* → Protein shake 150 cal "estimated
+   portion", Banana 105.
+2. Tapped the shake, set 1 scoop / 210 / 30 / 8 / 4, Done → the row re-rendered
+   as **"1 scoop · your numbers"**, totals recalculated to 315.
+3. Logged it. Database: `personal_foods` holds `protein shake / 1 scoop / 210 /
+   times_used 1`; the shake entry is `manual`, the banana `ai`, both with
+   correct `food_id` links.
+4. *"2 protein shakes and a banana"* — first attempt came back at 200 cal as a
+   plain estimate, which is the bug above. After the fix: **both shakes at 210
+   cal, "your numbers"**, banana still an estimate.
+5. Logged that too: two `history` entries, one `ai`, and `times_used` went to 3
+   — one correction plus two uses.
+
+The throwaway account was deleted afterwards and the cascades verified: zero
+entries, zero usage rows, zero personal foods left, `profiles` back to 2.
+`tsc --noEmit` and `expo lint` are both clean.
+
+### Marketing folder
+
+Danny's ask, same session: **`marketing/MARKETING.md`** now exists and
+ROADMAP.md points at it. 90-day eating/fitness challenges, his own daily meal
+tracking as the long-term content, influencer and informational content around
+it, heavy organic and word of mouth, **paid ads only after consistent monthly
+profit**. Two things written down that weren't in the ask and should be argued
+with if he disagrees: the no-judgement promise binds the marketing as hard as
+the app (a challenge is a consistency challenge, not a weight-loss competition,
+and no leaderboards get into the product through the back door), and a challenge
+can't ask anyone to *install* until Phase 8 — though the daily-tracking content
+can start now, since it's the same activity as Phase 2's outstanding "done
+when".
+
+### Noted, not fixed
+
+The Supabase security advisor is otherwise clean but flags **leaked-password
+protection disabled** — a dashboard toggle that checks new passwords against
+HaveIBeenPwned. It's one click, it's Danny's to click, and it's queued in
+QUESTIONS.md rather than left as a surprise at beta.
+
+**Next run:** follow-up questions are what's left in Phase 4, and they need a
+design argument before code — every question is friction in the flow PRODUCT.md
+calls the primary one. The alternative is to start Phase 5 (suggestions) and
+leave follow-ups until there's evidence people want to be asked.
+
+---
+
 ## 2026-09-14 — single-best food resolution, and the `food_id` link becoming trustworthy
 
 The last structural item in Phase 4's list: *"Fix single-best food resolution
