@@ -28,6 +28,15 @@ prototype.
 is simple, easy, and doesn't judge anyone. That's the differentiator, not a slogan —
 it decides what gets built and what gets refused.
 
+**Danny's direction 2026-09-17, and it outranks the phase order below when the
+two conflict:** the way you log food is settled and he likes it — type what you
+ate, it lands. The investment from here is **accuracy on vague, casual and
+restaurant descriptions**, not a new input method. Photo logging is explicitly
+not the priority. The full statement, with the eleven-item Marcel dinner that
+is the working benchmark, is in `PRODUCT.md` → Easy → "The bet". Not started,
+by his call — recorded so it's the first thing read when it is. What it will
+mean in practice is below, under **Accuracy work (not scheduled)**.
+
 **Marketing is tracked in `marketing/MARKETING.md`, not here.** This file is what
 gets built; that one is what gets said. Danny's plan as of 2026-09-17: 90-day
 eating/fitness challenges with his own daily meal tracking as the long-term
@@ -296,6 +305,54 @@ remains in Phase 4 is the three items above and nothing structural.)*
 the running app. **Follow-up questions are the only Phase 4 item left**, and
 they are the one that has to argue with PRODUCT.md's "easy" promise before
 they're built — every question is friction in the primary flow.)*
+
+---
+
+## Accuracy work (not scheduled)
+
+Danny's 2026-09-17 direction, written down so it isn't re-derived later. **Not
+started, by his call.** This is a track, not a phase — it runs alongside
+whatever phase is current, and the statement it serves is in `PRODUCT.md` →
+Easy → "The bet".
+
+**The goal in one line:** a vague, casual, real-world description — an eleven-item
+restaurant dinner, a dish nobody has published nutrition for — comes back right,
+measurably and repeatably.
+
+**The instrument already exists and is the bottleneck.** `evals/meals.jsonl` is
+50 meals with hand-checked ground truth, and `evals/run.py` scores any pipeline
+against it. It under-represents exactly the case that now matters: it has a
+`restaurant` tag, but nothing like a full multi-course meal at an independent
+restaurant. First move is extending the set, and the expensive part is the
+ground truth, not the sentences — a place like Marcel publishes nothing, so
+"correct" has to be built from menu descriptions and comparable published
+dishes, and may have to be a range rather than a point. **Nothing else on this
+list means anything until that exists**, because every lever below is a claim
+that needs a number.
+
+**The levers, cheapest first.** Each one is measurable with the harness as it
+stands:
+
+- **Model tier.** `--model` already swaps it and the function reads one string.
+  Haiku 4.5 beat the baseline at 14.2% mean calorie error; whether Sonnet 5 is
+  meaningfully better on *hard* meals specifically is a question worth about
+  fifty cents.
+- **The prompt, against observed failures.** Named dishes that aren't generic
+  ("pommes aligot" is not "potatoes"), one phrase that is several foods ("bread
+  service"), the same food said twice in one sentence, and the portion
+  assumptions behind "a glass of wine".
+- **Giving the model the restaurant.** Looking up the actual menu changes the
+  architecture and the cost per parse, so it needs the numbers to justify it,
+  not enthusiasm.
+
+**Two things that are already helping and should be counted before anything new
+is built:** `resolve_food` returns nothing rather than a bad match, and as of
+2026-09-17 a corrected food stays corrected — so the meals a person actually
+repeats get more accurate without anyone being asked anything.
+
+**Two things this must not become.** Follow-up questions as an accuracy crutch,
+and photo input as a substitute for getting the sentence right. Both trade away
+the thing Danny says already works.
 
 ---
 

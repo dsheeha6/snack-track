@@ -150,10 +150,31 @@ protection disabled** — a dashboard toggle that checks new passwords against
 HaveIBeenPwned. It's one click, it's Danny's to click, and it's queued in
 QUESTIONS.md rather than left as a surprise at beta.
 
+### Direction recorded at the end of the session: accuracy, not a new input
+
+Danny, after seeing the above, and explicitly **not to be worked on yet**: the
+way logging works is settled and he likes it — type what you ate, it lands. What
+the product should get better at is **accuracy on vague, casual, restaurant
+descriptions**, and photo logging is *not* the priority, because typing or
+speaking is just as easy, carries what a camera can't, and is a cleaner problem
+for the model to solve.
+
+His benchmark is a real dinner at Marcel in Atlanta: reserve burger, caesar
+salad, steak tartare, pommes aligot, baguette, bread service, brie, gelato, and
+a glass of wine — eleven items, an independent restaurant with no published
+nutrition, dish names that aren't generic. He ran it and says it did well.
+
+Written into `PRODUCT.md` (Easy → "The bet") because it's a positioning call
+that should settle future arguments, and into ROADMAP.md as **Accuracy work
+(not scheduled)** with the honest first step: `evals/meals.jsonl` has a
+`restaurant` tag but nothing like this meal, and the hard part of adding it is
+the ground truth, not the sentence. No code this session.
+
 **Next run:** follow-up questions are what's left in Phase 4, and they need a
 design argument before code — every question is friction in the flow PRODUCT.md
-calls the primary one. The alternative is to start Phase 5 (suggestions) and
-leave follow-ups until there's evidence people want to be asked.
+calls the primary one, and Danny's direction above makes that argument harder to
+win, not easier. The alternative is to start Phase 5 (suggestions), or to start
+the accuracy track by extending the eval set.
 
 ---
 

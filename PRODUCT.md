@@ -35,6 +35,36 @@ Logging has to take seconds, or people stop.
   they ate.
 - Any flow that takes more than three taps for a repeat meal is a bug.
 
+#### The bet: accuracy from vague descriptions
+**Danny's direction, 2026-09-17.** The input method is settled — you say what you
+ate, in your own words, and it lands. What the product invests in from here is
+**how accurate that is when the description is vague, casual, or a real
+restaurant meal nobody has a nutrition label for.** That is the thing worth
+being best in the world at.
+
+The standard is a sentence like this one, which is a real meal and the working
+benchmark:
+
+> dinner at Marcel in Atlanta — their reserve burger, serving of caesar salad,
+> steak tartare, pommes aligot, baguette, bread service, brie, gelato, and a
+> glass of wine
+
+Eleven items, an independent restaurant with no published nutrition, named
+dishes that aren't generic ("pommes aligot" is not "potatoes"), and two items
+that are the same food said two ways. Danny ran it and reports it did well.
+"Did well" isn't the bar — *measurably better, meal after meal* is.
+
+- **Photo logging is not the priority, and saying so is the point.** A photo is
+  easy, but typing or speaking is just as easy, carries what a camera can't
+  (the restaurant, the dish name, the size you actually ate), and is a cleaner
+  problem for the model. Camera input is not on the "not building" list; it is
+  simply not where the effort goes.
+- **This is measured, not asserted.** `evals/meals.jsonl` is the instrument, and
+  it currently under-represents exactly this case. See ROADMAP.
+- **Accuracy work must not cost simplicity.** Anything that makes the sentence
+  box slower, chattier, or more interrogative to buy accuracy is the wrong
+  trade — that includes follow-up questions.
+
 ### No judgement
 This is the differentiator and the thing most trackers get wrong.
 
