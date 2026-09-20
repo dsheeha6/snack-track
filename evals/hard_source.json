@@ -1,0 +1,344 @@
+{
+  "_README": [
+    "Ground-truth SOURCE for the hard meal set. This file is the derivation;",
+    "evals/meals_hard.jsonl is generated from it by evals/build_hard.py and is the",
+    "thing run.py scores. Edit this file, never the generated one.",
+    "",
+    "Every item carries a [low, high] band per macro rather than a point, because",
+    "for these meals a point would be a lie: 'pommes aligot' spans 267-932 kcal",
+    "across published recipes, and an independent restaurant publishes nothing.",
+    "The band is the range a careful human with the menu in front of them would",
+    "defend, not a confidence interval.",
+    "",
+    "The scoring convention, which decides the numbers and so has to be stated:",
+    "a sentence with no sharing language means ONE FULL PORTION of each named",
+    "item. 'split', 'shared', 'half of', 'about a third' are honoured literally.",
+    "This is the only reading that matches what the app is for - it logs what you",
+    "ate - and without it the same sentence is scorable to within a factor of two.",
+    "See evals/HARD_MEALS.md for how each band was built and what it assumes."
+  ],
+
+  "meals": [
+    {
+      "id": "h01",
+      "text": "dinner at marcel in atlanta - their reserve burger, serving of caesar salad, steak tartare, pommes aligot, baguette, bread service, brie, gelato, and a glass of wine",
+      "meal": "dinner",
+      "tags": ["restaurant", "multi-course", "multi-item", "named-dish", "duplicate-item", "not-in-table", "no-explicit-unit"],
+      "note": "THE BENCHMARK (PRODUCT.md -> Easy -> 'The bet'). Eleven listed items at an independent steakhouse with no published nutrition. Two traps: the Reserve Burger is not a burger-shaped burger, and 'baguette' + 'bread service' are one food said twice.",
+      "items": [
+        {
+          "name": "Marcel Reserve Burger",
+          "cal": [1800, 2400], "p": [105, 135], "c": [85, 120], "f": [120, 165],
+          "why": "Menu confirms it exists ('Marcel Reserve Burger, dry aged, onions, jus', $37.95). Press describes a ONE-POUND patty of 28-day dry-aged ribeye+chuck, gruyere, Alon's sesame brioche bun, served with frites, a small salad and a roasted marrow bone. Build: 16oz raw 80/20 blend ~1140 kcal broiled down to ~950-1050; gruyere 1.5oz ~170; brioche bun ~300; steakhouse frites ~400-500; single marrow bone ~120-180; small salad ~50; onions/jus ~50. A generic 'burger' estimate of 600-800 is the failure this item exists to catch."
+        },
+        {
+          "name": "Caesar a la minute",
+          "cal": [420, 700], "p": [9, 16], "c": [14, 26], "f": [34, 58],
+          "why": "Menu item, $14.95, no protein listed. Full restaurant caesar: romaine, parmesan, croutons, egg-and-oil dressing made tableside. Restaurant caesars run heavy on dressing; band spans a restrained kitchen to a generous one."
+        },
+        {
+          "name": "Steak tartare with rosemary focaccia",
+          "cal": [480, 700], "p": [26, 38], "c": [35, 55], "f": [24, 38],
+          "why": "Menu: 'STEAK TARTARE, spring onion vinaigrette, rosemary focaccia', $24.95, appetizer portion. 4-5oz raw beef ~250; yolk and oil/vinaigrette ~100-150; the focaccia that comes with it ~200-280. The focaccia is most of the carbs and is easy to miss."
+        },
+        {
+          "name": "Pommes aligot",
+          "cal": [430, 680], "p": [11, 18], "c": [36, 55], "f": [26, 44],
+          "why": "Menu side, $15.95. Published recipes span 267-932 kcal/serving depending on cheese-to-potato ratio; a restaurant side of potato, Tomme, cream and butter sits in the upper middle. This is the widest honest band on the plate and the reason ranges exist."
+        },
+        {
+          "name": "Bread service (includes the baguette), with butter",
+          "cal": [260, 450], "p": [7, 13], "c": [42, 72], "f": [7, 18],
+          "why": "COUNTED ONCE, on purpose. 'baguette' and 'bread service' are the same bread named twice - the sentence lists them separately because people talk that way, not because two breads arrived. A parser that adds both is wrong by ~350 kcal; one that drops both is wrong by the same. 3-4 pieces with butter."
+        },
+        {
+          "name": "Brie course",
+          "cal": [220, 380], "p": [10, 17], "c": [6, 18], "f": [16, 29],
+          "why": "Not on the 2023 dinner menu (cheese runs separately). ~2oz brie ~190 plus whatever it is served with - crackers, honey, fruit - at ~60-130."
+        },
+        {
+          "name": "Gelato",
+          "cal": [260, 440], "p": [4, 8], "c": [30, 52], "f": [12, 25],
+          "why": "Restaurant dessert portion, two scoops. Gelato is lower-fat and denser than ice cream, so per-scoop calories land near it despite the lower butterfat."
+        },
+        {
+          "name": "Glass of red wine",
+          "cal": [125, 180], "p": [0, 0], "c": [3, 6], "f": [0, 0],
+          "why": "A restaurant pour is 5-6oz, not the 5oz on a label. PRODUCT.md names 'the portion assumptions behind a glass of wine' as a known failure mode."
+        }
+      ]
+    },
+
+    {
+      "id": "h02",
+      "text": "split a bunch of small plates at an italian place with my girlfriend - burrata, grilled octopus, cacio e pepe, and a margherita pizza. i had two glasses of natural wine",
+      "meal": "dinner",
+      "tags": ["restaurant", "shared-plate", "multi-item", "named-dish", "partial-portion", "drinks"],
+      "note": "The sharing counterpart to h01. 'split ... with my girlfriend' is explicit and applies to the four plates but NOT to the wine, which is claimed in the first person. Halving everything is as wrong as halving nothing.",
+      "items": [
+        {"name": "half a burrata app", "cal": [170, 290], "p": [9, 15], "c": [6, 16], "f": [13, 23],
+         "why": "Full burrata starter (cheese, oil, bread or tomato) ~340-580; halved."},
+        {"name": "half a grilled octopus app", "cal": [150, 260], "p": [14, 24], "c": [8, 18], "f": [7, 15],
+         "why": "Full app ~300-520 with oil and potato or beans; halved."},
+        {"name": "half a cacio e pepe", "cal": [370, 570], "p": [13, 20], "c": [40, 60], "f": [16, 29],
+         "why": "Full restaurant portion ~740-1140 (pecorino and butter carry it); halved."},
+        {"name": "half a margherita pizza", "cal": [420, 660], "p": [18, 28], "c": [52, 80], "f": [15, 28],
+         "why": "Whole 12in margherita ~840-1320; halved."},
+        {"name": "two glasses of natural wine", "cal": [250, 360], "p": [0, 0], "c": [5, 14], "f": [0, 0],
+         "why": "NOT halved - 'i had two glasses' is first person. Natural wine skews lower ABV and can carry residual sugar."}
+      ]
+    },
+
+    {
+      "id": "h03",
+      "text": "omakase at a little sushi place, twelve courses, mostly nigiri, plus miso soup and tamago at the end",
+      "meal": "dinner",
+      "tags": ["restaurant", "one-phrase-many-foods", "multi-course", "not-in-table", "ambiguous"],
+      "note": "'twelve courses' is one phrase standing in for a dozen foods that are never named. The only way to be right is to know what an omakase course is.",
+      "items": [
+        {"name": "twelve omakase courses, mostly nigiri", "cal": [700, 1200], "p": [65, 110], "c": [75, 120], "f": [15, 40],
+         "why": "A nigiri piece is 40-65 kcal; twelve courses at a small counter usually means a mix of nigiri, a sashimi course and a cooked one, so the total runs above 12x nigiri. Rice is the carb load and is invisible in the word 'omakase'."},
+        {"name": "miso soup", "cal": [35, 70], "p": [2, 5], "c": [3, 8], "f": [1, 3], "why": "Standard bowl."},
+        {"name": "tamago", "cal": [50, 90], "p": [3, 6], "c": [4, 9], "f": [2, 5], "why": "One piece of sweet egg omelette over rice."}
+      ]
+    },
+
+    {
+      "id": "h04",
+      "text": "adjaruli khachapuri and four khinkali at a georgian place, and one of those tarragon lemonades",
+      "meal": "dinner",
+      "tags": ["restaurant", "named-dish", "not-in-table", "unknowable"],
+      "note": "Named dishes with essentially no US nutrition data. Adjaruli khachapuri is the trap: it reads like 'cheese bread' and is a bread boat holding a half-pound of cheese, an egg and a slab of butter.",
+      "items": [
+        {"name": "adjaruli khachapuri", "cal": [900, 1500], "p": [40, 65], "c": [80, 130], "f": [45, 85],
+         "why": "Restaurant portion: yeasted boat ~250-350g flour-based dough, 200-300g sulguni/imeretian cheese, one egg, 1-2 tbsp butter stirred in at the table. Widely reported in the 900-1600 range. A parser that says 'cheese bread, 400' is off by a factor of three."},
+        {"name": "four khinkali", "cal": [360, 520], "p": [18, 28], "c": [40, 60], "f": [12, 22],
+         "why": "Beef-and-pork soup dumplings, each ~90-130 kcal at restaurant size (they are large - 4 is a normal order, not a snack)."},
+        {"name": "tarragon lemonade", "cal": [90, 160], "p": [0, 0], "c": [22, 40], "f": [0, 0],
+         "why": "Bottled Georgian tarragon soda, ~12oz, sugar-sweetened."}
+      ]
+    },
+
+    {
+      "id": "h05",
+      "text": "three birria tacos and the consome from the truck down the street",
+      "meal": "lunch",
+      "tags": ["restaurant", "named-dish", "not-in-table", "typo"],
+      "note": "'consome' is misspelled the way people actually type it. Birria tacos are griddled in fat and cheesed, so the generic 'taco' number is far too low.",
+      "items": [
+        {"name": "three birria tacos", "cal": [690, 960], "p": [36, 54], "c": [45, 66], "f": [36, 54],
+         "why": "Each: corn tortilla dipped in the fat cap and griddled, ~2oz stewed beef, melted cheese - 230-320 kcal. A plain 'beef taco' at 150 undercounts by half."},
+        {"name": "cup of consomme", "cal": [80, 180], "p": [5, 12], "c": [3, 8], "f": [5, 13],
+         "why": "Dipping cup of the braising liquid, fat included. Small, but not zero, and it is the item most likely to be dropped entirely."}
+      ]
+    },
+
+    {
+      "id": "h06",
+      "text": "ethiopian with friends, we shared a big veggie platter with injera and i had maybe a third of it",
+      "meal": "dinner",
+      "tags": ["restaurant", "shared-plate", "partial-portion", "named-dish", "no-explicit-unit"],
+      "note": "Explicit fraction of a shared dish. The injera is the hidden half of the calories and is named almost in passing.",
+      "items": [
+        {"name": "a third of a veggie combo platter", "cal": [350, 600], "p": [14, 26], "c": [50, 85], "f": [10, 22],
+         "why": "Full combo (misir wot, gomen, shiro, atkilt, salad, often kik alicha) ~1050-1800 with the niter kibbeh; taken at a third."},
+        {"name": "a third of the injera", "cal": [250, 420], "p": [8, 16], "c": [50, 85], "f": [1, 4],
+         "why": "A platter is lined with one large injera and served with 2-3 rolled ones; a third of that is ~1.5 rounds at ~170-280 each."}
+      ]
+    },
+
+    {
+      "id": "h07",
+      "text": "split a 22 oz cote de boeuf with my dad, plus the creamed corn and we killed half a bottle of cabernet between us",
+      "meal": "dinner",
+      "tags": ["restaurant", "shared-plate", "partial-portion", "named-dish", "drinks"],
+      "note": "Three different sharing rules in one sentence: the steak is explicitly split, the side is not, and 'half a bottle between us' means a quarter bottle each. Getting two of the three right still misses.",
+      "items": [
+        {"name": "half of a 22oz dry-aged cote de boeuf", "cal": [700, 1000], "p": [60, 85], "c": [0, 2], "f": [50, 75],
+         "why": "22oz is the menu (raw, bone-in) weight; half is ~11oz raw, ~7-8oz of edible cooked ribeye after bone and shrink. Dry-aged ribeye is fatty."},
+        {"name": "creamed corn au gratin", "cal": [380, 600], "p": [8, 15], "c": [35, 55], "f": [22, 40],
+         "why": "NOT halved - the sentence splits the steak and the wine, and says nothing about the side. Full menu side with cream and gratin topping."},
+        {"name": "a quarter bottle of cabernet", "cal": [150, 215], "p": [0, 0], "c": [4, 8], "f": [0, 0],
+         "why": "'half a bottle between us' = a quarter bottle each = ~6.3oz, roughly one generous glass. A parser reading this as half a bottle doubles it."}
+      ]
+    },
+
+    {
+      "id": "h08",
+      "text": "cacio e pepe and some bread at dinner",
+      "meal": "dinner",
+      "tags": ["restaurant", "named-dish", "no-explicit-unit", "ambiguous"],
+      "note": "Deliberately short. Isolates one named dish so its error is not hidden inside a large meal - 'pasta with cheese and pepper' sounds light and is not.",
+      "items": [
+        {"name": "cacio e pepe", "cal": [740, 1140], "p": [25, 40], "c": [80, 120], "f": [32, 58],
+         "why": "Restaurant entree portion: ~120-140g dry tonnarelli, 60-90g pecorino, butter or starchy emulsion. The cheese is a third of the calories."},
+        {"name": "some bread", "cal": [180, 340], "p": [5, 10], "c": [28, 50], "f": [5, 14],
+         "why": "'some' at a restaurant is 2-3 pieces, with oil or butter."}
+      ]
+    },
+
+    {
+      "id": "h09",
+      "text": "bibimbap with a fried egg on top and a side of kimchi",
+      "meal": "lunch",
+      "tags": ["restaurant", "named-dish", "multi-item"],
+      "note": "A named dish that IS reasonably documented - included as a control. If the hard set scores badly on h09 too, the problem is the pipeline, not the obscurity.",
+      "items": [
+        {"name": "bibimbap", "cal": [650, 950], "p": [28, 45], "c": [85, 120], "f": [18, 35],
+         "why": "Restaurant bowl: ~1.5-2 cups rice, seasoned vegetables, ~3oz beef, gochujang and sesame oil. Stone-bowl versions run higher for the oil."},
+        {"name": "fried egg", "cal": [85, 120], "p": [6, 8], "c": [0, 1], "f": [6, 10], "why": "One egg fried in oil."},
+        {"name": "side of kimchi", "cal": [15, 40], "p": [1, 3], "c": [2, 7], "f": [0, 1], "why": "Banchan portion."}
+      ]
+    },
+
+    {
+      "id": "h10",
+      "text": "just the pommes aligot as a side",
+      "meal": "dinner",
+      "tags": ["restaurant", "named-dish", "not-in-table"],
+      "note": "The single widest-variance item from h01, pulled out on its own. Published recipes span 267-932 kcal per serving, so this measures whether the pipeline knows the dish or is guessing 'mashed potatoes'.",
+      "items": [
+        {"name": "pommes aligot", "cal": [430, 680], "p": [11, 18], "c": [36, 55], "f": [26, 44],
+         "why": "Same band as h01. 'Potatoes' would be ~200 and is the wrong answer; the cheese and cream are the dish."}
+      ]
+    },
+
+    {
+      "id": "h11",
+      "text": "went pretty hard at the office bagel spread this morning",
+      "meal": "breakfast",
+      "tags": ["casual-phrasing", "no-explicit-unit", "ambiguous", "unknowable"],
+      "note": "No food is named and no quantity is given. The only signal is 'went pretty hard'. A wide band is the honest ground truth here - the test is whether the pipeline lands inside it rather than returning 300 kcal or refusing.",
+      "items": [
+        {"name": "two bagels with cream cheese", "cal": [700, 1200], "p": [22, 40], "c": [95, 160], "f": [22, 45],
+         "why": "A deli bagel is 280-350 and 'went hard' means at least two, generously schmeared (2-3 tbsp each at ~50/tbsp). The band covers 'two modest' to 'two-and-a-half loaded'."}
+      ]
+    },
+
+    {
+      "id": "h12",
+      "text": "a few handfuls of trail mix and some cheese cubes at the party",
+      "meal": "snacks",
+      "tags": ["casual-phrasing", "no-explicit-unit", "ambiguous"],
+      "note": "'a few handfuls' and 'some' are the two most common real-world quantity words and neither maps to a unit. Trail mix is calorie-dense enough that a handful-sized error is a 150 kcal error.",
+      "items": [
+        {"name": "a few handfuls of trail mix", "cal": [380, 700], "p": [10, 20], "c": [35, 65], "f": [22, 45],
+         "why": "A handful is ~1-1.5oz at ~140-160 kcal; 'a few' is 3, occasionally 4."},
+        {"name": "some cheese cubes", "cal": [110, 300], "p": [7, 19], "c": [1, 4], "f": [9, 25],
+         "why": "A cube is ~1/2oz cheddar at ~57 kcal; 'some' at a party is 2-5."}
+      ]
+    },
+
+    {
+      "id": "h13",
+      "text": "big bowl of my moms chili with a bunch of cheese and sour cream on top",
+      "meal": "dinner",
+      "tags": ["home-cooked", "casual-phrasing", "no-explicit-unit", "not-in-table"],
+      "note": "Home cooking with no recipe and three vague quantifiers ('big', 'a bunch of', unqualified sour cream). Nobody has published nutrition for someone's mother's chili.",
+      "items": [
+        {"name": "big bowl of beef chili", "cal": [500, 750], "p": [35, 50], "c": [40, 65], "f": [22, 38],
+         "why": "'Big bowl' is ~2 cups. Ground-beef-and-bean chili runs 250-375 per cup depending on the beef's fat and the bean-to-meat ratio."},
+        {"name": "a bunch of shredded cheese", "cal": [150, 260], "p": [10, 17], "c": [1, 3], "f": [12, 21],
+         "why": "'A bunch' on chili is 1/3 to 1/2 cup shredded cheddar (~110 kcal per 1/4 cup)."},
+        {"name": "sour cream", "cal": [60, 110], "p": [1, 2], "c": [1, 3], "f": [6, 11],
+         "why": "An unqualified dollop is 2-3 tbsp."}
+      ]
+    },
+
+    {
+      "id": "h14",
+      "text": "leftover pad thai, maybe two thirds of the container",
+      "meal": "lunch",
+      "tags": ["partial-portion", "fraction-qty", "restaurant", "named-dish"],
+      "note": "An explicit fraction of an implicit whole - the model has to know how big a takeout container is before the fraction means anything.",
+      "items": [
+        {"name": "two thirds of a takeout pad thai", "cal": [620, 950], "p": [22, 38], "c": [80, 125], "f": [22, 40],
+         "why": "A US takeout pad thai container is 930-1430 kcal (noodles, oil, sugar, peanuts, egg, usually chicken or shrimp); taken at two thirds."}
+      ]
+    },
+
+    {
+      "id": "h15",
+      "text": "chips and salsa before dinner, then i kept going back for more chips",
+      "meal": "snacks",
+      "tags": ["duplicate-item", "casual-phrasing", "no-explicit-unit"],
+      "note": "The deliberate inverse of h01's baguette/bread service. Here the repeated food IS additive - 'kept going back for more' is a second helping, not a restatement. A pipeline that learns to dedupe from h01 has to not dedupe here.",
+      "items": [
+        {"name": "tortilla chips, first serving plus refills", "cal": [400, 750], "p": [5, 10], "c": [50, 95], "f": [20, 40],
+         "why": "A restaurant basket is ~2-3oz at 140 kcal/oz; 'kept going back' means the basket plus most of another. Counting one basket is the failure."},
+        {"name": "salsa", "cal": [30, 70], "p": [1, 3], "c": [6, 14], "f": [0, 1], "why": "1/2 to 1 cup over the session."}
+      ]
+    },
+
+    {
+      "id": "h16",
+      "text": "a full english at the pub",
+      "meal": "breakfast",
+      "tags": ["one-phrase-many-foods", "named-dish", "restaurant", "not-in-table"],
+      "note": "Four words, eight or nine foods, none of them named. The whole task is knowing what is on the plate.",
+      "items": [
+        {"name": "full english breakfast", "cal": [900, 1400], "p": [45, 70], "c": [60, 100], "f": [50, 85],
+         "why": "Two eggs, two bangers, 2-3 rashers of back bacon, baked beans, grilled tomato, mushrooms, fried bread or toast, sometimes black pudding and a hash brown. Pub versions sit at the top of the band."}
+      ]
+    },
+
+    {
+      "id": "h17",
+      "text": "a flat white and then another flat white a couple hours later, both with oat milk",
+      "meal": "snacks",
+      "tags": ["duplicate-item", "casual-phrasing", "drinks"],
+      "note": "The same drink twice, stated in one sentence, with the modifier attached at the end and applying to both. Tests additive duplicates plus a trailing modifier.",
+      "items": [
+        {"name": "two flat whites with oat milk", "cal": [220, 340], "p": [4, 9], "c": [24, 38], "f": [8, 16],
+         "why": "A 6oz flat white is mostly milk; oat milk is ~120 kcal/cup and higher-carb than dairy. Each ~110-170. Returning one drink halves it."}
+      ]
+    },
+
+    {
+      "id": "h18",
+      "text": "threw together a stir fry with chicken, whatever veg was in the fridge, and rice",
+      "meal": "dinner",
+      "tags": ["home-cooked", "casual-phrasing", "no-explicit-unit", "ambiguous"],
+      "note": "Home cooking where one ingredient is literally unspecified ('whatever veg'). The oil is invisible in the sentence and is a third of the fat.",
+      "items": [
+        {"name": "chicken", "cal": [250, 360], "p": [42, 56], "c": [0, 2], "f": [7, 15],
+         "why": "A home portion is 5-7oz raw breast or thigh."},
+        {"name": "mixed vegetables cooked in oil", "cal": [150, 300], "p": [4, 9], "c": [15, 30], "f": [8, 20],
+         "why": "1.5-2 cups of veg is only 60-100 kcal; the 1-2 tbsp of oil they were cooked in is 120-240 and is never mentioned out loud."},
+        {"name": "rice", "cal": [200, 320], "p": [4, 7], "c": [44, 70], "f": [0, 2],
+         "why": "1 to 1.5 cups cooked white rice."},
+        {"name": "stir fry sauce", "cal": [30, 90], "p": [1, 3], "c": [5, 18], "f": [0, 3],
+         "why": "Soy, oyster or hoisin - small but sugary."}
+      ]
+    },
+
+    {
+      "id": "h19",
+      "text": "made a smoothie - banana, scoop of whey, peanut butter, oat milk, handful of spinach",
+      "meal": "breakfast",
+      "tags": ["home-cooked", "multi-item", "no-explicit-unit"],
+      "note": "Every ingredient named, none measured except 'scoop'. Included as the easier end of the hard set - if this one is wrong, vague quantity is the problem rather than obscure food.",
+      "items": [
+        {"name": "banana", "cal": [90, 120], "p": [1, 2], "c": [23, 31], "f": [0, 1], "why": "Medium to large."},
+        {"name": "scoop of whey", "cal": [110, 140], "p": [20, 28], "c": [2, 6], "f": [1, 3], "why": "One 30-32g scoop, isolate to concentrate."},
+        {"name": "peanut butter", "cal": [95, 200], "p": [4, 8], "c": [3, 8], "f": [8, 17], "why": "Unmeasured means 1-2 tbsp, and people under-report this one."},
+        {"name": "oat milk", "cal": [120, 190], "p": [2, 4], "c": [20, 33], "f": [3, 8], "why": "1 to 1.5 cups."},
+        {"name": "handful of spinach", "cal": [5, 15], "p": [1, 2], "c": [1, 2], "f": [0, 0], "why": "1-2 cups raw, nutritionally close to nothing."}
+      ]
+    },
+
+    {
+      "id": "h20",
+      "text": "couple beers and a whiskey at the bar",
+      "meal": "snacks",
+      "tags": ["drinks", "casual-phrasing", "no-explicit-unit", "ambiguous"],
+      "note": "Alcohol with no style or size given. A light lager and a double IPA differ by 150 kcal a can, which is the whole error budget for this meal.",
+      "items": [
+        {"name": "couple beers", "cal": [280, 480], "p": [2, 5], "c": [20, 45], "f": [0, 0],
+         "why": "Two 12oz: light lager ~100-150 each, craft IPA ~200-240 each. The band spans the realistic middle, not the extremes."},
+        {"name": "whiskey", "cal": [100, 150], "p": [0, 0], "c": [0, 1], "f": [0, 0],
+         "why": "A bar pour is 1.5-2oz neat at ~70 kcal/oz."}
+      ]
+    }
+  ]
+}

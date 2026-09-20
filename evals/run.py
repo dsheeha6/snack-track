@@ -1,11 +1,19 @@
 """Accuracy harness for SNACK TRACK's natural-language food logging.
 
-Scores a parsing pipeline against evals/meals.jsonl (50 real meal sentences
-with hand-checked calorie/protein/carb/fat ground truth) and prints a report.
+Scores a parsing pipeline against a meal set and prints a report. There are two
+sets and they answer different questions:
+
+    meals.jsonl       50 everyday sentences, POINT ground truth. The regression
+                      set - frozen, and the file the BUILD_LOG numbers (19.8%
+                      baseline, 14.2% Haiku) are measured on. Don't add to it.
+    meals_hard.jsonl  20 vague/casual/restaurant meals, RANGE ground truth.
+                      The instrument for the accuracy bet in PRODUCT.md.
+                      Generated from hard_source.json; see HARD_MEALS.md.
 
 Usage:
-    python run.py                  # score the local prototype parser (baseline)
-    python run.py --json out.json  # also write the full per-meal results
+    python run.py                             # prototype parser on the easy 50
+    python run.py --meals meals_hard.jsonl    # ...on the hard 20
+    python run.py --json out.json             # also write full per-meal results
 
 The baseline pipeline is ../../calorie-tracker/parse.py, run with no logging
 history (an empty entries list), so its "history" shortcut never fires and
@@ -90,6 +98,7 @@ def run_baseline(meals):
             "text": meal["text"],
             "tags": meal.get("tags", []),
             "expected": meal["expected"],
+            "expected_range": meal.get("expected_range"),
             "predicted": predicted,
             "unresolved_items": unresolved,
         })
@@ -146,6 +155,7 @@ def run_claude(meals, model=DEFAULT_MODEL, resolve="none", workers=8):
             "text": meal["text"],
             "tags": meal.get("tags", []),
             "expected": meal["expected"],
+            "expected_range": meal.get("expected_range"),
             "predicted": predicted,
             "unresolved_items": unresolved,
             "items": parsed["items"],
@@ -162,7 +172,29 @@ PIPELINES = {
 }
 
 
-def pct_error(expected, predicted):
+def pct_error(expected, predicted, band=None):
+    """Percent error against a point, or against a band if the meal has one.
+
+    `meals.jsonl` has point ground truth and scores exactly as it always did.
+    `meals_hard.jsonl` has a [lo, hi] band per macro, because for a dish nobody
+    publishes nutrition for a point would be a fabricated precision. Inside the
+    band is zero error - there is no basis for preferring 4,700 to 4,900 when
+    the truth is "somewhere in 4,560-5,365". Outside it, the error is measured
+    from the nearest edge, so the penalty is continuous and a near miss stays a
+    near miss.
+
+    Measuring from the edge (not the midpoint) is the whole point: it makes the
+    band an admission of what we do not know, rather than a free pass that
+    shrinks every error by the same factor.
+    """
+    if band is not None:
+        lo, hi = band
+        if lo <= predicted <= hi:
+            return 0.0
+        edge = lo if predicted < lo else hi
+        if edge == 0:
+            return 0.0 if abs(predicted) < 1e-9 else 100.0
+        return abs(predicted - edge) / abs(edge) * 100.0
     if expected == 0:
         return 0.0 if abs(predicted) < 1e-9 else 100.0
     return abs(predicted - expected) / abs(expected) * 100.0
@@ -170,8 +202,13 @@ def pct_error(expected, predicted):
 
 def score(results, tolerance_pct=15.0):
     for r in results:
-        r["error"] = {k: pct_error(r["expected"][k], r["predicted"][k]) for k in MACROS}
+        ranges = r.get("expected_range") or {}
+        r["error"] = {
+            k: pct_error(r["expected"][k], r["predicted"][k], ranges.get(k))
+            for k in MACROS
+        }
         r["within_tolerance"] = r["error"]["calories"] <= tolerance_pct
+        r["inside_band"] = bool(ranges) and r["error"]["calories"] == 0.0
 
     summary = {"n_meals": len(results), "tolerance_pct": tolerance_pct}
     for k in MACROS:
@@ -182,6 +219,15 @@ def score(results, tolerance_pct=15.0):
     within = [r for r in results if r["within_tolerance"]]
     summary["within_tolerance_count"] = len(within)
     summary["within_tolerance_pct"] = round(100.0 * len(within) / len(results), 1)
+
+    banded = [r for r in results if r.get("expected_range")]
+    if banded:
+        # The stricter headline for a banded set: not "close enough" but
+        # "landed inside the range a careful human would defend".
+        inside = [r for r in banded if r["inside_band"]]
+        summary["banded_meals"] = len(banded)
+        summary["inside_band_count"] = len(inside)
+        summary["inside_band_pct"] = round(100.0 * len(inside) / len(banded), 1)
 
     by_tag = {}
     for r in results:
@@ -210,6 +256,11 @@ def print_report(summary, results, show_worst=10):
           f"{summary['within_tolerance_count']}/{summary['n_meals']} "
           f"({summary['within_tolerance_pct']}%)")
 
+    if "inside_band_count" in summary:
+        print(f"Landed inside the calorie band: "
+              f"{summary['inside_band_count']}/{summary['banded_meals']} "
+              f"({summary['inside_band_pct']}%)")
+
     print(f"Meals with at least one unresolved item: {summary['meals_with_unresolved_items']}")
 
     print("\nCalorie mean % error by tag:")
@@ -220,9 +271,11 @@ def print_report(summary, results, show_worst=10):
     print(f"\nWorst {len(worst)} meals by calorie error:")
     for r in worst:
         exp, pred = r["expected"]["calories"], r["predicted"]["calories"]
+        band = (r.get("expected_range") or {}).get("calories")
+        target = f"expected {band[0]:g}-{band[1]:g}" if band else f"expected {exp}"
         flag = " [unresolved: " + ", ".join(r["unresolved_items"]) + "]" if r["unresolved_items"] else ""
         print(f"  {r['error']['calories']:>6.1f}%  {r['id']}  \"{r['text'][:50]}\"  "
-              f"(expected {exp}, got {pred}){flag}")
+              f"({target}, got {pred}){flag}")
     print()
 
 

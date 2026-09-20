@@ -5,6 +5,102 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-20 — the hard meal set, and the discovery that every miss is an undercount
+
+Danny's call: do the eval set before the last Phase 4 item. The accuracy bet in
+`PRODUCT.md` had no instrument pointed at it, and every lever on the list was a
+claim that needed a number. Now there's a number, and it says something more
+useful than "Sonnet is better".
+
+### What got built
+
+`evals/meals_hard.jsonl` — 20 meals aimed at vague, casual and restaurant
+descriptions. `evals/meals.jsonl` was **not touched**: it stays the frozen
+regression set so the 19.8% baseline and 14.2% Haiku figures above stay
+comparable. Re-running it after the harness change reproduces 19.8% / 28 of 50 /
+12 unresolved exactly, which is the only reason to trust anything below.
+
+**Ground truth is a range, and that was the expensive part.** Pommes aligot
+spans 267-932 kcal per serving across published recipes; Marcel publishes
+nothing at all. A point value would have been a fabrication that every model
+then got scored against. So each *item* carries a `[low, high]` band with the
+reasoning beside it in `evals/hard_source.json`, and `build_hard.py` rolls those
+up into the scored file. Three decisions worth keeping:
+
+- **Bands combine in quadrature, not linearly.** Midpoints add; half-widths add
+  as `sqrt(Σh²)`. Adding half-widths straight up makes an eight-item meal's band
+  so wide nothing can fail it, and an eval nothing can fail measures nothing.
+  The linear band is still written to every row as `expected_range_linear` so
+  the looser reading is one flag away.
+- **Error is measured from the nearest band edge, not the midpoint.** The band
+  is an admission of what we don't know, not a discount applied to every miss.
+- **The convention that decides every number: no sharing language means one
+  full portion of each named item.** "split", "shared", "a third of" are
+  honoured literally. Without this rule the same sentence is scorable to within
+  a factor of two. It's why the Marcel dinner's ground truth is ~5,000 kcal.
+
+Ground truth for `h01` came off Marcel's own 2023 dinner menu (which confirms
+the Reserve Burger, the tartare's rosemary focaccia, the Caesar à la minute and
+aligot as a side) plus press describing the burger: **a one-pound patty of
+28-day dry-aged ribeye and chuck, gruyère, an Alon's brioche bun, with frites, a
+small salad and a roasted marrow bone**. That item alone is ~2,100 kcal.
+
+`run.py` now scores either file; `--meals` already existed. `HARD_MEALS.md` has
+the full method and should be read before anyone edits a band.
+
+### The numbers
+
+| pipeline | mean kcal err | median | within 15% | inside band | unresolved | $/meal |
+|---|---|---|---|---|---|---|
+| prototype `parse.py` | 67.7% | 78.0% | 2/20 | 2/20 | 17/20 | — |
+| `claude-haiku-4-5` | 15.1% | 6.8% | 12/20 | 7/20 | 3/20 | $0.0026 |
+| `claude-sonnet-5` | 10.2% | 5.8% | 15/20 | 6/20 | 9/20 | $0.0058 |
+
+The prototype scores 19.8% on the easy 50 and 67.7% here, so the set is doing
+its job — it separates pipelines the easy set rates as similar.
+
+### The finding
+
+**27 out-of-band misses across both models. All 27 are undercounts. Zero
+overcounts.** That's a bias, not noise, and a bias is a prompt problem before
+it's a model problem. Both models price restaurant portions as home portions.
+The Marcel dinner item by item — truth / haiku / sonnet:
+
+    Reserve Burger              2100 /  750 /  950
+    Caesar à la minute           560 /  320 /  320
+    Steak tartare + focaccia     590 /  280 /  300
+    Pommes aligot                555 /  400 /  400
+    Gelato                       350 /  140 /  200
+
+Every line low. The one apparent exception is the bread, and only by accident:
+both models counted `baguette` *and* `bread service` as separate foods (~460
+against 355 counted once), so bread was over-counted while everything else was
+under. The dedupe isn't working — it's being masked by the bias. Worth saying
+plainly rather than claiming a pass.
+
+Two things this reorders:
+
+- **Model tier is real but second.** Sonnet 5 cuts mean error by a third for
+  2.2x the cost and does *not* fix the bias — it undercounts on 14 of 20 meals
+  too, just by less (14.6% mean shortfall vs Haiku's 23.3%). Revisit it after
+  the prompt work, when the remaining error isn't something a sentence can fix.
+- **Follow-up questions — the last open Phase 4 item — would not have helped a
+  single one of these.** Every sentence was complete; nobody needed to be asked
+  anything. The gap is knowledge of what a restaurant serves. That's the
+  strongest argument yet for PRODUCT.md's refusal to buy accuracy with
+  interrogation, and it's now a measurement rather than a preference.
+
+One honest caveat: Sonnet lands inside the band on *fewer* meals than Haiku
+(6 vs 7) while being much better on mean error — the two metrics measure
+different things, and Sonnet's misses are smaller but still outside. Sonnet also
+flags low confidence three times as often (9 meals vs 3), which for a pipeline
+that systematically undercounts is arguably the more honest behaviour.
+
+Nothing was changed in the prompt or the edge function this run. The next move
+is the prompt, against a bias that now has a number on it.
+
+---
+
 ## 2026-09-17 — corrections that stick, metering that can't be forged, and a marketing folder
 
 Two of Phase 4's three remaining items, both built and both driven by hand in

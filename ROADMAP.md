@@ -33,9 +33,10 @@ two conflict:** the way you log food is settled and he likes it — type what yo
 ate, it lands. The investment from here is **accuracy on vague, casual and
 restaurant descriptions**, not a new input method. Photo logging is explicitly
 not the priority. The full statement, with the eleven-item Marcel dinner that
-is the working benchmark, is in `PRODUCT.md` → Easy → "The bet". Not started,
-by his call — recorded so it's the first thing read when it is. What it will
-mean in practice is below, under **Accuracy work (not scheduled)**.
+is the working benchmark, is in `PRODUCT.md` → Easy → "The bet". **Started
+2026-09-20:** the 20-meal hard set exists, and the first run says both models
+undercount restaurant portions on every meal they miss. Details below, under
+**Accuracy work**.
 
 **Marketing is tracked in `marketing/MARKETING.md`, not here.** This file is what
 gets built; that one is what gets said. Danny's plan as of 2026-09-17: 90-day
@@ -308,10 +309,11 @@ they're built — every question is friction in the primary flow.)*
 
 ---
 
-## Accuracy work (not scheduled)
+## Accuracy work (started 2026-09-20)
 
-Danny's 2026-09-17 direction, written down so it isn't re-derived later. **Not
-started, by his call.** This is a track, not a phase — it runs alongside
+Danny's 2026-09-17 direction, written down so it isn't re-derived later.
+**Started 2026-09-20 at his call — the measuring instrument is built and the
+first numbers are in.** This is a track, not a phase — it runs alongside
 whatever phase is current, and the statement it serves is in `PRODUCT.md` →
 Easy → "The bet".
 
@@ -319,31 +321,47 @@ Easy → "The bet".
 restaurant dinner, a dish nobody has published nutrition for — comes back right,
 measurably and repeatably.
 
-**The instrument already exists and is the bottleneck.** `evals/meals.jsonl` is
-50 meals with hand-checked ground truth, and `evals/run.py` scores any pipeline
-against it. It under-represents exactly the case that now matters: it has a
-`restaurant` tag, but nothing like a full multi-course meal at an independent
-restaurant. First move is extending the set, and the expensive part is the
-ground truth, not the sentences — a place like Marcel publishes nothing, so
-"correct" has to be built from menu descriptions and comparable published
-dishes, and may have to be a range rather than a point. **Nothing else on this
-list means anything until that exists**, because every lever below is a claim
-that needs a number.
+- [x] **The instrument exists** — done 2026-09-20. `evals/meals_hard.jsonl`, 20
+      meals covering exactly the case that matters, with **range ground truth**
+      because a point would be a fabrication (pommes aligot spans 267-932 kcal
+      across published recipes). `evals/meals.jsonl` is untouched and stays the
+      frozen regression set, so the 19.8%/14.2% numbers stay comparable. The
+      derivation lives in `evals/hard_source.json` — a `[low, high]` band per
+      *item* with a `why` beside it — and `build_hard.py` rolls those up into
+      the scored file. `run.py` scores either set. **Read `evals/HARD_MEALS.md`
+      before touching any of it**; the one convention that decides every number
+      is that a sentence with no sharing language means one full portion of
+      each named item.
 
-**The levers, cheapest first.** Each one is measurable with the harness as it
-stands:
+**First results, 2026-09-20.** The set separates pipelines the easy 50 rates as
+similar: prototype **67.7%** mean calorie error, Haiku 4.5 **15.1%**, Sonnet 5
+**10.2%**. (Same prototype scores 19.8% on the easy set.)
 
-- **Model tier.** `--model` already swaps it and the function reads one string.
-  Haiku 4.5 beat the baseline at 14.2% mean calorie error; whether Sonnet 5 is
-  meaningfully better on *hard* meals specifically is a question worth about
-  fifty cents.
-- **The prompt, against observed failures.** Named dishes that aren't generic
-  ("pommes aligot" is not "potatoes"), one phrase that is several foods ("bread
-  service"), the same food said twice in one sentence, and the portion
-  assumptions behind "a glass of wine".
+**The finding, and it reorders the levers below: every miss is an undercount.**
+27 out-of-band misses across both models, 27 of them low, none high. Both models
+estimate restaurant portions as home portions — on the Marcel dinner, Haiku put
+the one-pound dry-aged Reserve Burger at 750 kcal against a defensible 2,100,
+and every other item on the plate was low too. That is a bias, and a bias is a
+prompt problem before it is a model problem.
+
+**The levers, re-ranked by what the run showed:**
+
+- **The prompt, and it is now aimed at something specific.** Restaurant portions
+  are not home portions; a named dish served with something (steak tartare and
+  its focaccia) includes the something; "bread service" and "baguette" in one
+  sentence are one bread. This is the cheap lever and it targets the measured
+  bias directly.
+- **Model tier — real, but second.** Sonnet 5 cuts mean error by a third for
+  2.2x the cost ($0.0058/meal vs $0.0026). It does not fix the bias: Sonnet
+  undercounts on 14 of 20 meals too, just by less. Worth revisiting after the
+  prompt work, when the remaining error isn't something a sentence could fix.
 - **Giving the model the restaurant.** Looking up the actual menu changes the
   architecture and the cost per parse, so it needs the numbers to justify it,
-  not enthusiasm.
+  not enthusiasm. Still unjustified.
+- **Follow-up questions would not have helped any of these** and the run says so
+  in numbers — every sentence was complete, nobody needed to be asked anything,
+  and the gap was knowledge of what a restaurant serves. That is the strongest
+  argument yet for PRODUCT.md's refusal to buy accuracy with interrogation.
 
 **Two things that are already helping and should be counted before anything new
 is built:** `resolve_food` returns nothing rather than a bad match, and as of
