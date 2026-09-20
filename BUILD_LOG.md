@@ -5,6 +5,65 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-20 (last) — the restaurant-portion prompt ships, measured properly this time
+
+**Shipped: parse-meal v19**, carrying the prompt that the entry below could not
+tell apart from noise. Ten runs per variant settled it.
+
+| metric | v13 | v15 | p | verdict |
+|---|---|---|---|---|
+| hard 20, mean kcal error | 18.09% (sd 3.52) | **14.90%** (sd 1.91) | **0.025** | v15 better |
+| hard 20, within 15% | 10.6/20 | 11.4/20 | 0.26 | no difference |
+| easy 50, mean kcal error | 16.72% | 17.28% | 0.73 | no regression |
+| easy 50, within 15% | 34.6/50 | 35.6/50 | 0.23 | no difference |
+
+The ship criterion was Danny's: improve the hard set without regressing the easy
+50. Both hold. Welch t-test, since the two variants have visibly different
+variance and pooling them would have been wrong.
+
+**What the extra runs bought, concretely.** The entry below rolled this same
+prompt back on the strength of single runs. Ten runs say it was a real
+improvement all along — 3.19 points, 95% CI [0.53, 5.85]. The single v13 run
+that started the morning (15.1%) sat at the bottom of a 14.0-23.3 range whose
+true centre is 18.1%; the single v15 run (14.5%) happened to sit near its centre
+of 14.9%. Two unlucky draws in opposite directions produced a confident, wrong
+conclusion in both directions on the same day. Total cost of doing it properly:
+about $3 and forty minutes.
+
+**A second thing the repeats bought, which was not the goal:** v15 is roughly
+half as variable as v13 (sd 1.91 vs 3.52) on the hard set. For a number someone
+reads once and acts on, consistency is worth nearly as much as accuracy, and a
+single-run comparison cannot see it at all.
+
+**Two limits worth stating rather than burying.** The hard-set confidence
+interval is wide — the direction of the win is solid, its size is not. And the
+easy-50 test at n=10 has a 95% CI of [-2.81, +3.93] on the difference, so it
+rules out a regression larger than about 4 points, not a small one. If the
+everyday set ever becomes the thing being optimised, it needs more runs.
+
+Also disproved: the "non-restaurant meals regressed 5.8% -> 16.0%" worry from
+the entry below. That was a subset of single runs, and the easy 50 — which is
+almost entirely everyday food — shows no regression at n=10.
+
+### Harness change this needed
+
+`--repeat 10` on the hard set is 200 requests, and the first attempt died on its
+first meal: a stale negative DNS entry, `getaddrinfo failed`, whole job gone.
+`run_claude` now retries transient failures (network errors, 408/429/5xx) four
+times with exponential backoff, and still exits immediately on a 400 or a
+rejected key, where retrying only spends money. Without this, repeats are not
+practical and none of the above gets measured.
+
+### Verification habit worth keeping
+
+Each deploy's `ezbr_sha256` was checked against the previous build of the same
+prompt: v17 and v19 both returned `f3f1fe66...` (the v15 prompt) and v18
+returned `0c2df6b2...` (the v13 prompt, matching v16). Since deploying means
+retyping the whole file through a tool call, that hash is the only cheap proof
+that the thing measured is the thing intended.
+
+---
+
 ## 2026-09-20 (later still) — Tier 1 attempt 1: no prompt improvement, but the reason is worth more
 
 **Outcome: nothing shipped. Production is back on the v13 prompt (deployed as

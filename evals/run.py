@@ -33,6 +33,7 @@ import json
 import os
 import statistics
 import sys
+import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -45,6 +46,10 @@ PROTOTYPE_DIR = REPO_ROOT.parent / "calorie-tracker"
 MACROS = ("calories", "protein", "carbs", "fat")
 
 DEFAULT_MODEL = "claude-haiku-4-5"
+
+# Transient failures to ride out rather than abandon a run for.
+RETRIES = 4
+RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
 
 
 def load_env_local():
@@ -135,14 +140,29 @@ def run_claude(meals, model=DEFAULT_MODEL, resolve="none", workers=8):
                 "Content-Type": "application/json",
             },
         )
-        try:
-            with urllib.request.urlopen(req, timeout=90) as r:
-                parsed = json.load(r)
-        except urllib.error.HTTPError as e:
-            detail = e.read().decode(errors="replace")[:300]
-            sys.exit(f"{meal['id']}: edge function returned {e.code} — {detail}")
-        except Exception as e:  # noqa: BLE001 - surface the cause, don't score a hole
-            sys.exit(f"{meal['id']}: {type(e).__name__}: {e}")
+        # --repeat 10 on the hard set is 200 requests, and a single transient
+        # failure used to kill the whole job: on 2026-09-20 a stale negative DNS
+        # entry ended a ten-run pass on its first meal. Retry what is worth
+        # retrying — network blips, rate limits, gateway errors — and still exit
+        # loudly on the codes that mean something is genuinely wrong, like a 400
+        # or a rejected key, where retrying just wastes money.
+        parsed = None
+        last_error = None
+        for attempt in range(RETRIES):
+            try:
+                with urllib.request.urlopen(req, timeout=90) as r:
+                    parsed = json.load(r)
+                break
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode(errors="replace")[:300]
+                if e.code not in RETRYABLE_STATUS:
+                    sys.exit(f"{meal['id']}: edge function returned {e.code} — {detail}")
+                last_error = f"HTTP {e.code} — {detail}"
+            except Exception as e:  # noqa: BLE001 - surface the cause, don't score a hole
+                last_error = f"{type(e).__name__}: {e}"
+            time.sleep(2 ** attempt)
+        else:
+            sys.exit(f"{meal['id']}: still failing after {RETRIES} attempts — {last_error}")
 
         predicted = {k: float(parsed["totals"].get(k, 0.0)) for k in MACROS}
         # "unresolved" has to mean the same thing it means for the baseline, or

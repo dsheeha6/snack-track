@@ -33,10 +33,11 @@ two conflict:** the way you log food is settled and he likes it — type what yo
 ate, it lands. The investment from here is **accuracy on vague, casual and
 restaurant descriptions**, not a new input method. Photo logging is explicitly
 not the priority. The full statement, with the eleven-item Marcel dinner that
-is the working benchmark, is in `PRODUCT.md` → Easy → "The bet". **Started
-2026-09-20:** the 20-meal hard set exists, and the first run says both models
-undercount restaurant portions on every meal they miss. Details below, under
-**Accuracy work**.
+is the working benchmark, is in `PRODUCT.md` → Easy → "The bet". **First win landed 2026-09-20:** the
+20-meal hard set exists, it showed both models undercounting restaurant
+portions on every meal they missed, and the prompt fix for that is shipped —
+**18.09% → 14.90%** mean calorie error on hard meals (p=0.025), no regression
+on the everyday 50. Details below, under **Accuracy work**.
 
 **Danny's direction 2026-09-20, and it sets the order of everything below:**
 he is starting to see visual work, features and bugs worth doing, but
@@ -355,16 +356,16 @@ target. Details under **Accuracy work** below.
       **Nothing below is decided on a single run again.** Ten runs puts the
       standard error near 1 point and costs ~$0.60 a variant on the hard set,
       ~$1.00 on the easy 50. Spend it.
-- [ ] **Fix the undercount bias in the `parse-meal` prompt** — attempt 1 landed
-      nothing. Two revisions (v14, v15) were built, deployed and scored; all
-      differences fell inside the noise, and production is back on the v13
-      prompt (redeployed as v16). The revisions are in BUILD_LOG and are worth
-      re-testing at `--repeat 10` rather than rewriting from scratch.
-      **One lead worth testing properly:** the restaurant-tagged subset moved
-      21.3% → 18.1% → 13.5% across the three versions while non-restaurant
-      meals moved the other way, 5.8% → 13.9% → 16.0%. If that trade is real,
-      scope the restaurant guidance to sentences that actually mention a
-      restaurant instead of applying it globally.
+- [x] **Restaurant-portion prompt shipped** — 2026-09-20, deployed as
+      **parse-meal v19**. Measured at `--repeat 10` per variant: hard 20 goes
+      **18.09% → 14.90%** mean calorie error (p=0.025, 95% CI [0.53, 5.85]) with
+      **no regression on the easy 50** (16.72% → 17.28%, p=0.73). It is also
+      about half as variable run to run (sd 1.91 vs 3.52).
+      The rules added: a restaurant serving is not a home serving; a named dish
+      is that dish and not its category; count what the dish arrives with; and
+      the same food named twice in one sentence is one item, while a second
+      helping adds. The feared non-restaurant regression was itself noise — the
+      easy 50 is almost entirely everyday food and shows none at n=10.
 - [ ] **Haiku vs Sonnet 5 is not settled.** The 15.1% vs 10.2% gap recorded
       earlier on 09-20 is 4.9 points against a 6.1-point spread — it is not a
       result. Re-run both at `--repeat 10` before spending anything on the tier.

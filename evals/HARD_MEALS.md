@@ -133,10 +133,34 @@ $0.60 a variant on this set. That is the price of an A/B that means something.
 The prototype baseline row is exempt: `parse.py` is deterministic and scores
 67.7% every time.
 
-## Results, 2026-09-20
+## Results
 
-First run of the set, single pass each. 20 meals. **See the variance warning
-above — treat these as samples.**
+### The measured comparison, 2026-09-20 (10 runs each)
+
+This is the one to trust. Welch t-test on ten runs per variant.
+
+| metric | v13 prompt | v15 prompt | p | verdict |
+|---|---|---|---|---|
+| hard 20, mean kcal error | 18.09% (sd 3.52) | **14.90%** (sd 1.91) | **0.025** | v15 better |
+| hard 20, within 15% | 10.6/20 | 11.4/20 | 0.26 | no difference |
+| easy 50, mean kcal error | 16.72% | 17.28% | 0.73 | no regression |
+| easy 50, within 15% | 34.6/50 | 35.6/50 | 0.23 | no difference |
+
+**v15 shipped** (deployed as parse-meal v19). It improves hard meals by 3.19
+points, 95% CI [0.53, 5.85], and does not regress the everyday set. It is also
+roughly half as variable run to run (sd 1.91 vs 3.52), which matters for a
+number someone sees once and acts on.
+
+Two honest limits. The hard-set CI is wide, so the *size* of the win is
+uncertain even though its direction is not. And the easy-50 test at n=10 has a
+95% CI of [-2.81, +3.93] on the difference, so it rules out a regression larger
+than about 4 points — not a small one.
+
+### The single-run figures that started this, 2026-09-20
+
+Kept because they are a useful warning, not because they are measurements.
+
+20 meals, one pass each. **Every Claude row here is a sample.**
 
 | pipeline | mean kcal err | median | within 15% | inside band | meals w/ unresolved | $/meal |
 |---|---|---|---|---|---|---|

@@ -96,17 +96,37 @@ Rules that matter:
 - When no amount is stated, assume one typical serving and say so by setting
   confidence to "medium" — do not refuse and do not return zeros. "a bowl of
   oatmeal" is about a cup cooked.
-- For restaurant and chain items, use that chain's actual published nutrition.
-  A Chipotle chicken burrito bowl is not a generic burrito bowl.
+- For chains, use that chain's actual published nutrition. A Chipotle chicken
+  burrito bowl is not a generic burrito bowl.
+- Most restaurants are not chains and publish nothing, and a serving there is a
+  restaurant serving. Kitchens cook with far more butter, oil, cheese and cream
+  than a home cook does, and plate more of it: a restaurant portion is commonly
+  1.5 to 2 times the home or USDA serving of the same name. Price the dish as a
+  kitchen makes it, not as a nutrition label averages it.
+- A named dish is that dish, not its category. "Carbonara" is egg, hard cheese
+  and guanciale, not "pasta". "Poutine" is fries under curds and gravy, not
+  fries. If a dish has a name, price what that name actually contains.
+- Count what the dish arrives with. Moules come with frites, a curry comes with
+  rice or naan, a diner omelette comes with hash browns and toast. Those are
+  part of the item, not extras the person would have listed separately.
 - Condiments and small extras still count. Sriracha, ketchup, a splash of milk.
-- Combine nothing: if the sentence names three foods, return three items.
+- Combine nothing: if the sentence names three foods, return three items. One
+  exception — restatement. When two names in the same sentence are the same food
+  said twice ("a cheeseburger" and, later, "the burger"), that is one item. A
+  second helping is not restatement and does add: "a slice, then another slice"
+  is two slices.
 - Zero-calorie items (black coffee, water, diet soda) are real items with zeros,
   not omissions.
 - If something is genuinely unknowable — an unspecified homemade dish — give your
   best single estimate and set confidence to "low". Never return an empty list.
 
 Estimate the amount eaten, not the package size, unless the sentence says the
-whole package. Round to whole calories and one decimal for grams.`;
+whole package. Round to whole calories and one decimal for grams.
+
+The most common failure in this task is underestimating food that came out of a
+restaurant kitchen. When two portions are both plausible for a restaurant dish,
+do not reflexively take the smaller one — take the one that matches where the
+food came from.`;
 
 type Item = {
   name: string;
