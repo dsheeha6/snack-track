@@ -112,9 +112,31 @@ a pipeline that learns to dedupe from h01 must not dedupe there.
 
 ---
 
+## Read this before believing any number below
+
+**One run of this set cannot resolve a difference of a few percentage points.**
+Measured 2026-09-20: the *same* prompt run three times scored **22.8%, 16.7% and
+19.4%** mean calorie error — a 6.1-point spread, sd 3.1. On the easy 50 the same
+prompt scored 14.2% on 2026-09-13 and 16.8% on 2026-09-20.
+
+Every single-run figure in the table below is therefore a sample, not a
+measurement, and the gaps between the two Claude rows are inside the noise. Use
+`--repeat` for anything you intend to act on:
+
+```bash
+python run.py --meals meals_hard.jsonl --pipeline claude --repeat 10
+```
+
+At sd 3.1, ten runs puts the standard error near 1 point, which costs about
+$0.60 a variant on this set. That is the price of an A/B that means something.
+
+The prototype baseline row is exempt: `parse.py` is deterministic and scores
+67.7% every time.
+
 ## Results, 2026-09-20
 
-First run of the set. 20 meals.
+First run of the set, single pass each. 20 meals. **See the variance warning
+above — treat these as samples.**
 
 | pipeline | mean kcal err | median | within 15% | inside band | meals w/ unresolved | $/meal |
 |---|---|---|---|---|---|---|
@@ -149,10 +171,12 @@ else. The dedupe is not working — it is being masked.
 
 ### What this says about the levers
 
-- **Model tier is real but second.** Sonnet 5 cuts mean error by a third
-  (15.1% → 10.2%) for 2.2× the cost. Worth taking, but it does not fix the bias
-  — Sonnet undercounts on 14 of 20 meals too, just by less (14.6% mean
-  shortfall vs Haiku's 23.3%).
+- **Model tier: unresolved, and cheaper to settle than to guess.** Sonnet 5
+  looked a third better (15.1% → 10.2%) at 2.2x the cost — but that 4.9-point
+  gap is smaller than this set's 6.1-point single-run spread, so it is not yet
+  a result. Re-run both with `--repeat 10` before spending anything on it.
+  What does hold is that Sonnet undercounts on 14 of 20 meals too: whatever the
+  tier buys, it does not buy away the bias.
 - **The prompt is the cheap lever and it is aimed at something specific now:**
   restaurant portions are not home portions; a named dish served with something
   (tartare + focaccia) includes the something; "bread service" and "baguette"

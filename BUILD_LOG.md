@@ -5,6 +5,89 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-20 (later still) — Tier 1 attempt 1: no prompt improvement, but the reason is worth more
+
+**Outcome: nothing shipped. Production is back on the v13 prompt (deployed as
+v16, byte-identical rules).** The prompt work did not produce a measurable
+improvement, and the reason it could not is the actual finding.
+
+### What was tried
+
+Two prompt revisions against the measured undercount bias, both deployed and
+scored on the hard 20:
+
+- **v14** added restaurant-portion rules (a restaurant serving is 1.5-2x a home
+  or USDA one), a named-dish rule, a "count what the dish arrives with" rule,
+  and a restatement exception to "combine nothing".
+- **v15** removed one sentence from v14 — "this is not licence to inflate home
+  cooking or packaged food, which are already close" — on the theory it was
+  suppressing home-cooked estimates.
+
+One thing was caught before deploying and is worth keeping as a habit: the first
+draft of the prompt named the eval set's own dishes (pommes aligot, adjaruli
+khachapuri, the baguette/bread-service pair). That is teaching to the test and
+would have made the re-run meaningless. Rewritten with carbonara, poutine,
+moules-frites and a cheeseburger before anything ran. There is a contamination
+grep in the session history worth turning into a script.
+
+### The numbers, and why they say nothing
+
+    v13 (before)   15.1% mean   12/20 within 15%   7/20 in band
+    v14            16.4%        11/20              7/20
+    v15            14.5%        13/20              8/20
+
+Then the rollback was scored, and it was the rollback that produced the finding.
+**v16 is byte-identical to v13 and scored 16.8% on the easy 50, against the
+14.2% recorded for the same prompt on 2026-09-13.** Same prompt, different day,
+2.6 points apart.
+
+So the hard set was run three times with the same prompt and nothing else
+changed:
+
+    run 1   22.8% mean   8/20 within 15%
+    run 2   16.7%       13/20
+    run 3   19.4%        9/20
+
+**Spread 6.1 points, sd 3.1.** Every comparison above — v13 vs v14 vs v15, and
+also the Haiku-vs-Sonnet gap from earlier today (15.1% vs 10.2%, 4.9 points) —
+sits inside that band. None of them are results. The instrument as used cannot
+resolve what it was being asked to resolve.
+
+This invalidates a claim made earlier today in this file and in HARD_MEALS.md,
+both now corrected: the single-run Sonnet number was presented as a measured
+improvement and it is not one. The prototype baseline row stands — `parse.py` is
+deterministic and scores 67.7% every time.
+
+Honest note on the rollback: it was the right place to leave production, but the
+stated reason at the time ("v15 regressed the easy 50 from 14.2% to 16.6%") was
+wrong. 16.6% is indistinguishable from the 16.8% the old prompt scores today.
+
+### What changed in the repo
+
+`run.py --repeat N` runs the whole set N times and reports per-run figures plus
+the spread, ending with the line that matters: a difference smaller than the
+observed spread is not a result. The docstring carries the 14.2%/16.8% story so
+the next person doesn't rediscover it at the cost of two deploys.
+
+### What to do next, with a price on it
+
+At sd 3.1, ten runs puts the standard error near 1 point. Ten runs of the hard
+20 is about **$0.60 a variant**; the easy 50 is about **$1.00**. That is the
+real cost of an A/B here and it is cheap — the mistake today was not spending
+it. Concretely:
+
+1. Re-run v13 and v15 at `--repeat 10` each. The v15 rules may well be an
+   improvement; today simply cannot say.
+2. Settle Haiku vs Sonnet the same way, and only then decide on the tier.
+3. One signal is suggestive enough to test properly rather than drop: the
+   restaurant-tagged subset moved 21.3% -> 18.1% -> 13.5% across v13/v14/v15,
+   the same direction both times, while non-restaurant meals moved the other
+   way (5.8% -> 13.9% -> 16.0%). If that trade is real, the fix is to scope the
+   restaurant guidance to sentences that mention a restaurant rather than
+   applying it to everything. If it is noise, repeats will say so.
+
+---
+
 ## 2026-09-20 (later) — Tier 0 backend hygiene: RLS initplan, FK indexes, and a repo that can rebuild the database
 
 Danny's call this session: **get the backend, the database and the core function

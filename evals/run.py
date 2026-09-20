@@ -279,6 +279,37 @@ def print_report(summary, results, show_worst=10):
     print()
 
 
+def print_repeat_report(summaries, meals_n):
+    """Report N runs of the same pipeline, so the noise floor is visible.
+
+    This exists because of 2026-09-20: the v13 prompt scored 14.2% mean calorie
+    error on the easy 50 on 2026-09-13 and 16.8% on 2026-09-20 with nothing
+    changed but the day. A single run cannot resolve a two-point difference,
+    and two prompt versions were compared on exactly that basis before anyone
+    noticed. Any A/B smaller than the spread below is not a result.
+    """
+    print(f"\n{'='*60}")
+    print(f"REPEATED RUNS - {len(summaries)} runs x {meals_n} meals")
+    print(f"{'='*60}\n")
+    print(f"{'run':<6}{'kcal mean':>11}{'median':>9}{'within tol':>12}{'in band':>10}")
+    for i, s in enumerate(summaries, 1):
+        band = f"{s['inside_band_count']}/{s['banded_meals']}" if "inside_band_count" in s else "-"
+        print(f"{i:<6}{s['calories_mape']:>10}%{s['calories_median_ape']:>8}%"
+              f"{s['within_tolerance_count']:>8}/{meals_n:<3}{band:>10}")
+
+    means = [s["calories_mape"] for s in summaries]
+    within = [s["within_tolerance_count"] for s in summaries]
+    spread = max(means) - min(means)
+    print(f"\nmean calorie error: {statistics.fmean(means):.1f}% "
+          f"(range {min(means):.1f}-{max(means):.1f}, spread {spread:.1f} points"
+          + (f", sd {statistics.stdev(means):.1f}" if len(means) > 1 else "") + ")")
+    print(f"within tolerance:   {statistics.fmean(within):.1f}/{meals_n} "
+          f"(range {min(within)}-{max(within)})")
+    print(f"\nA difference smaller than {spread:.1f} points between two pipelines is "
+          f"not a result at this\nrun count. Raise --repeat, or accept the comparison "
+          f"is inconclusive.\n")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--pipeline", choices=list(PIPELINES.keys()), default="baseline")
@@ -291,14 +322,30 @@ def main():
     ap.add_argument("--resolve", choices=["none", "estimate", "db"], default="none",
                     help="claude pipeline only: whether a `foods` match overrides "
                          "Claude's numbers (default none - score the parse alone)")
+    ap.add_argument("--repeat", type=int, default=1,
+                    help="run the whole set N times and report the spread. Use this "
+                         "before believing any A/B: the same prompt has scored 14.2%% "
+                         "and 16.8%% on the easy 50 on different days.")
     args = ap.parse_args()
 
     meals = load_meals(args.meals)
-    if args.pipeline == "claude":
-        results = run_claude(meals, model=args.model, resolve=args.resolve)
+
+    def one_pass():
+        if args.pipeline == "claude":
+            return run_claude(meals, model=args.model, resolve=args.resolve)
+        return PIPELINES[args.pipeline](meals)
+
+    if args.repeat > 1:
+        summaries, results = [], None
+        for i in range(args.repeat):
+            results = one_pass()
+            summaries.append(score(results, tolerance_pct=args.tolerance))
+            print(f"run {i+1}/{args.repeat}: {summaries[-1]['calories_mape']}% mean calorie error")
+        print_repeat_report(summaries, len(meals))
+        summary = summaries[-1]  # the detail report below shows the last run
     else:
-        results = PIPELINES[args.pipeline](meals)
-    summary = score(results, tolerance_pct=args.tolerance)
+        results = one_pass()
+        summary = score(results, tolerance_pct=args.tolerance)
     print_report(summary, results)
 
     tokens_in = sum(r.get("usage", {}).get("input_tokens", 0) for r in results)

@@ -347,16 +347,33 @@ below. Visual and feature ideas are not lost — they are queued behind this.
 The parse function is where the product lives, and the hard eval set gave it a
 target. Details under **Accuracy work** below.
 
-- [ ] **Fix the undercount bias in the `parse-meal` prompt.** 27 out-of-band
-      misses, 27 undercounts, zero overcounts — restaurant portions priced as
-      home portions. Three specific corrections: restaurant portions aren't home
-      portions; a dish served with something includes the something; the same
-      food named twice in one sentence may be one food. Re-run **both** eval
-      sets — hard 20 for the bias, easy 50 to prove no regression.
-- [ ] **Then** decide Haiku vs Sonnet 5. Deciding before the prompt fix means
-      paying 2.2x to paper over something a sentence fixes.
+- [x] **The eval can now measure its own noise** — `run.py --repeat N`, added
+      2026-09-20 after two prompt revisions were compared on single runs and the
+      comparison turned out to be meaningless. **Same prompt, three runs of the
+      hard 20: 22.8% / 16.7% / 19.4% — spread 6.1 points, sd 3.1.** The easy 50
+      scored 14.2% on 09-13 and 16.8% on 09-20 with nothing changed.
+      **Nothing below is decided on a single run again.** Ten runs puts the
+      standard error near 1 point and costs ~$0.60 a variant on the hard set,
+      ~$1.00 on the easy 50. Spend it.
+- [ ] **Fix the undercount bias in the `parse-meal` prompt** — attempt 1 landed
+      nothing. Two revisions (v14, v15) were built, deployed and scored; all
+      differences fell inside the noise, and production is back on the v13
+      prompt (redeployed as v16). The revisions are in BUILD_LOG and are worth
+      re-testing at `--repeat 10` rather than rewriting from scratch.
+      **One lead worth testing properly:** the restaurant-tagged subset moved
+      21.3% → 18.1% → 13.5% across the three versions while non-restaurant
+      meals moved the other way, 5.8% → 13.9% → 16.0%. If that trade is real,
+      scope the restaurant guidance to sentences that actually mention a
+      restaurant instead of applying it globally.
+- [ ] **Haiku vs Sonnet 5 is not settled.** The 15.1% vs 10.2% gap recorded
+      earlier on 09-20 is 4.9 points against a 6.1-point spread — it is not a
+      result. Re-run both at `--repeat 10` before spending anything on the tier.
 - [ ] **The baguette / bread-service dedupe bug**, currently masked by the
       bias. Expect h01 to move oddly before it moves right.
+- [ ] **Never put eval-set dishes in the prompt.** The first v14 draft named
+      pommes aligot, adjaruli khachapuri and the baguette/bread-service pair —
+      caught before deploying, but it would have made the re-run meaningless.
+      Worth a contamination check in `scripts/`.
 
 ### Tier 2 — the schema change that gets costlier the longer it waits
 
