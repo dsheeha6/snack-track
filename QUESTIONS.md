@@ -19,6 +19,11 @@ are already public.
 Not urgent while the only accounts are yours and mine, genuinely worth having
 before anyone else installs it (Phase 8).
 
+**Update 2026-09-20:** this is now the *only* security advisor finding and the
+last open item in Tier 0 of the backend-first plan (ROADMAP → Backend first).
+Everything else in that tier is done and verified. Flip this and the backend is
+clean.
+
 **Danny:**
 
 ### Goal-based nutrient tracking — scope it into its own phase, don't sneak it into 2

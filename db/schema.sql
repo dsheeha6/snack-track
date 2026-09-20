@@ -52,6 +52,10 @@ create table public.target_history (
   reason text,
   created_at timestamptz not null default now()
 );
+-- Covers the user_id foreign key (an unindexed FK makes every auth.users
+-- delete scan this table) and matches the only read there is: the latest
+-- target for a user.
+create index target_history_user_date_idx on public.target_history (user_id, effective_on desc);
 
 -- The food log.
 create table public.entries (
@@ -71,6 +75,10 @@ create table public.entries (
   created_at timestamptz not null default now()
 );
 create index entries_user_date_idx on public.entries (user_id, eaten_on desc);
+-- Covers the entries.food_id foreign key added with the resolve_food link.
+-- Without it, `on delete set null` has to scan entries on every foods delete,
+-- which the sugar/fiber re-seed of 407k rows would do in bulk.
+create index entries_food_id_idx on public.entries (food_id);
 
 -- Shared food database (USDA / Open Food Facts). Read-only to clients.
 create table public.foods (
@@ -198,19 +206,19 @@ alter table public.ai_usage enable row level security;
 alter table public.water_log enable row level security;
 
 create policy "own profile" on public.profiles
-  for all to authenticated using (auth.uid() = id) with check (auth.uid() = id);
+  for all to authenticated using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
 create policy "own targets" on public.target_history
-  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 create policy "own entries" on public.entries
-  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 create policy "own personal foods" on public.personal_foods
-  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 create policy "own water log" on public.water_log
-  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 create policy "own weights" on public.weights
-  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 create policy "own suggestion feedback" on public.suggestion_feedback
-  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 -- ---------- ranked food search ----------
 -- Ranking lives here, not in the client. With ~407k rows an alphabetical
@@ -440,9 +448,9 @@ create policy "read foods" on public.foods
 
 -- Entitlements and usage are readable by their owner, written only by the server.
 create policy "read own subscription" on public.subscriptions
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 create policy "read own ai usage" on public.ai_usage
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 
 -- ---------- new signups get a profile row ----------
 create function public.handle_new_user()
@@ -555,3 +563,25 @@ $$;
 revoke all on function public.touch_personal_food(text) from public;
 revoke all on function public.touch_personal_food(text) from anon;
 grant execute on function public.touch_personal_food(text) to authenticated;
+
+-- Migration version/name list, for scripts/check_migrations.py. The
+-- supabase_migrations schema is not exposed through PostgREST and we hold only
+-- the API keys, not the database password, so without this the repo cannot
+-- check itself against what is actually applied.
+--
+-- Returns version and name only, never the SQL body. CREATE FUNCTION grants
+-- EXECUTE to PUBLIC by default, so the revokes below are the access control.
+create or replace function public.applied_migrations()
+returns table(version text, name text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select m.version, m.name
+  from supabase_migrations.schema_migrations m
+  order by m.version
+$$;
+
+revoke all on function public.applied_migrations() from public, anon, authenticated;
+grant execute on function public.applied_migrations() to service_role;

@@ -38,6 +38,11 @@ is the working benchmark, is in `PRODUCT.md` → Easy → "The bet". **Started
 undercount restaurant portions on every meal they miss. Details below, under
 **Accuracy work**.
 
+**Danny's direction 2026-09-20, and it sets the order of everything below:**
+he is starting to see visual work, features and bugs worth doing, but
+**the backend, the database and the core parse function get solid first.**
+The tiered plan and what's done against it is under **Backend first** below.
+
 **Marketing is tracked in `marketing/MARKETING.md`, not here.** This file is what
 gets built; that one is what gets said. Danny's plan as of 2026-09-17: 90-day
 eating/fitness challenges with his own daily meal tracking as the long-term
@@ -306,6 +311,64 @@ remains in Phase 4 is the three items above and nothing structural.)*
 the running app. **Follow-up questions are the only Phase 4 item left**, and
 they are the one that has to argue with PRODUCT.md's "easy" promise before
 they're built — every question is friction in the primary flow.)*
+
+---
+
+## Backend first (Danny's direction 2026-09-20)
+
+Runs ahead of new features, and ahead of the design pass and retention work
+below. Visual and feature ideas are not lost — they are queued behind this.
+
+### Tier 0 — database hygiene ✅ done 2026-09-20 (bar one dashboard click)
+
+- [x] **RLS initplan fixed on all nine tables.** Every policy wrapped
+      `auth.uid()` in a scalar subquery via `ALTER POLICY` (never DROP +
+      CREATE, so no table is ever policy-less mid-migration). `foods` excluded
+      — `using (true)` calls nothing. Verified by impersonating the owner, a
+      second user and anon: 31 / 0 / 0 / 0 entries visible. Advisor clear.
+- [x] **Covering indexes for the two unindexed foreign keys** —
+      `entries.food_id` (added 9/14, never indexed) and
+      `target_history (user_id, effective_on desc)`. Matters most during the
+      sugar/fiber re-seed, which churns 407k `foods` rows.
+- [x] **The database can be rebuilt from the repo.** All 24 migrations are now
+      in `supabase/migrations/` — before this they existed *only* inside the
+      Supabase project. `scripts/check_migrations.py` compares applied-vs-repo
+      both ways and checks every live table and function appears in
+      `db/schema.sql`; exit code gates a commit. Run it after any schema change.
+      Note the constraint it works around: **no Supabase CLI on this machine and
+      no database password, only API keys** — so `pg_dump` is not available and
+      the check is inventory-level, not column-level.
+- [ ] **Leaked password protection — Danny's click, 30 seconds.**
+      Authentication → Policies. The only security advisor finding left, and the
+      last thing between here and a clean backend. Also tracked in QUESTIONS.md.
+
+### Tier 1 — the core function
+
+The parse function is where the product lives, and the hard eval set gave it a
+target. Details under **Accuracy work** below.
+
+- [ ] **Fix the undercount bias in the `parse-meal` prompt.** 27 out-of-band
+      misses, 27 undercounts, zero overcounts — restaurant portions priced as
+      home portions. Three specific corrections: restaurant portions aren't home
+      portions; a dish served with something includes the something; the same
+      food named twice in one sentence may be one food. Re-run **both** eval
+      sets — hard 20 for the bias, easy 50 to prove no regression.
+- [ ] **Then** decide Haiku vs Sonnet 5. Deciding before the prompt fix means
+      paying 2.2x to paper over something a sentence fixes.
+- [ ] **The baguette / bread-service dedupe bug**, currently masked by the
+      bias. Expect h01 to move oddly before it moves right.
+
+### Tier 2 — the schema change that gets costlier the longer it waits
+
+- [ ] **Sugar + fiber together** (Danny confirmed 2026-08-22). Three tables,
+      `WANT_NUTRIENTS` in three seeder files that must change as a set, and a
+      re-seed measured in tens of minutes. Cheapest while Danny is the only
+      person with data. Full scope in QUESTIONS.md.
+
+### Tier 3 — only after the above
+
+- [ ] Close out Phase 4 (follow-up questions — see the recommendation under
+      Accuracy work) and start Phase 5.
 
 ---
 

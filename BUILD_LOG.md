@@ -5,6 +5,98 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-20 (later) — Tier 0 backend hygiene: RLS initplan, FK indexes, and a repo that can rebuild the database
+
+Danny's call this session: **get the backend, the database and the core function
+solid before any visual or feature work.** This is the first half of that — the
+database. All three items verified against the live project, not just applied.
+
+### Every RLS policy re-evaluated `auth.uid()` per row
+
+The performance advisor flagged `auth_rls_initplan` on **all nine** RLS'd
+tables. Unwrapped, Postgres treats `auth.uid()` as volatile and calls it once
+per candidate row; wrapped in a scalar subquery it becomes an InitPlan evaluated
+once per statement. Same access control, same rows — purely how often the
+function runs. Invisible at 31 entries, not invisible at scale.
+
+Migration `rls_initplan_wrap_auth_uid` rewrites all nine with **`ALTER POLICY`
+rather than DROP + CREATE**, so there is never an instant where a table sits
+without its policy. `public.foods` is deliberately untouched — its `read foods`
+policy is `using (true)` and calls nothing.
+
+Two things stayed as they were, on purpose:
+- **`auth.uid()` inside function bodies** (`remember_food`, `touch_personal_food`)
+  is not an initplan issue and was left alone.
+- **`ai_usage` stays read-only to its owner.** Rows are written by the edge
+  function with the service_role key, which bypasses RLS. That split is Phase
+  6's unforgeable free-tier count and must not quietly become client-writable
+  during a policy rewrite.
+
+**Verified by impersonation, not by reading the diff.** Set `request.jwt.claims`
+and `set local role authenticated` for three actors and counted:
+
+    owner (authenticated)                                31 entries
+    a different user                                      0
+    a different user, explicitly querying the owner id    0
+    anon                                                  0
+
+Advisor re-run afterwards: the nine `auth_rls_initplan` warnings are gone.
+
+### Two foreign keys with no covering index
+
+`entries.food_id` arrived 2026-09-14 with the resolve_food link and never got an
+index — so `on delete set null` has to sequential-scan `entries` on every
+`foods` delete. Cheap at 31 rows; not cheap during the sugar/fiber re-seed,
+which will churn 407k `foods` rows in bulk. `target_history.user_id` had the
+same gap and got a composite `(user_id, effective_on desc)`, which covers the
+constraint and also matches the only read the table has.
+
+Both advisor findings clear. The only performance lint left is `unused_index`
+on the two indexes just created, which is what "brand new" looks like.
+
+### The database could not be rebuilt from the repo
+
+This was the real structural problem. **All 21 migrations existed only inside
+the Supabase project.** `supabase/` in the repo held one edge function;
+`db/schema.sql` was maintained by hand. Lose the project, or want a staging
+copy, and there was no way back — and nothing would have noticed `schema.sql`
+drifting from reality.
+
+`supabase/migrations/` now holds all 24 (21 + today's 3), exported with their
+comments intact. Getting them out took a workaround worth recording: there is
+no Supabase CLI on this machine and **we hold the API keys but not the database
+password**, so `pg_dump` and a direct connection are both unavailable. The
+export ran through a temporary `security definer` function read over PostgREST
+with the service_role key, then dropped — checked afterwards that no `__`-prefixed
+helper survived.
+
+`scripts/check_migrations.py` is what stops this recurring. Three checks:
+applied-vs-repo migrations both ways with name matching; every live table
+mentioned in `schema.sql`; every live RPC mentioned in `schema.sql`. Exit code
+gates a commit. It needs `public.applied_migrations()` (migration
+`add_applied_migrations_introspection`) because `supabase_migrations` is not a
+PostgREST-exposed schema — **version and name only, never the SQL body**, and
+revoked from public/anon/authenticated. Confirmed: service_role gets 200 and 24
+rows, the anon key gets `401 permission denied for function`.
+
+The checks are inventory-level, not column-level, and that limit is honest — a
+real column diff needs `pg_dump`. It catches the drift that actually happens
+here, which is a change applied straight to the project that the repo never
+hears about. It earned itself immediately: first run failed because
+`applied_migrations()` was live and missing from `schema.sql`.
+
+`db/schema.sql` now carries the wrapped policies, both new indexes and the new
+function, and the check passes clean: **24 applied, 24 in repo, 10 tables, 6
+functions, repo and database agree.**
+
+### Still open in Tier 0 — Danny's click
+
+**Leaked password protection** is the only security advisor finding left and
+it's a dashboard toggle nobody else can flip: Authentication → Policies. It is
+the last item before the backend is clean.
+
+---
+
 ## 2026-09-20 — the hard meal set, and the discovery that every miss is an undercount
 
 Danny's call: do the eval set before the last Phase 4 item. The accuracy bet in
