@@ -5,6 +5,71 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-21 — the burger undercount and the bread dedupe: one fixed, one needs Sonnet
+
+**Outcome: nothing deployed. Production is still v19 (the v15 prompt).** The
+session ended on an empty Anthropic credit balance, which also took **live
+parsing down**: parse-meal returns 500 "credit balance is too low" for every
+meal. Same key locally and deployed (sha256 prefix `4d6d6642e83d` both sides).
+Adding credits is Danny's; nothing in the code is wrong.
+
+### How it was measured
+
+`evals/variants/ab_local.py` pulls `SYSTEM` and `LOG_MEAL_TOOL` straight out of
+a copy of `index.ts` and calls the Messages API directly, scored by `run.py`'s
+own `score()`. No deploy per variant, so a prompt A/B costs minutes, not two
+deploys. It is not a substitute for `run.py` against the deployed function
+before shipping. That rule stands.
+
+### The bread dedupe: fixed, and it makes h01 look worse
+
+On production, h01 lists `baguette` and `bread service` as two items in **7-9
+of 10 runs**. One added paragraph to the restatement rule ("a general name
+beside a specific one for the same course is one item... tables get one bread
+service, not two") takes that to **0-1 of 10**. The second-helping cases hold:
+h15 (chips, then more chips) and h17 (two flat whites) still count twice. It
+is `evals/variants/v27_bread_only.ts`.
+
+The catch is the one ROADMAP predicted. h01 is under on every item, so removing
+~250 kcal of double-counted bread moves its total *further* from the truth.
+Run concurrently against production so day drift can't fake it: hard 20
+**13.98% (sd 1.41) vs 14.69% (sd 2.06)**, within noise. The easy 50 half of
+that pair died on the credit balance and is **not measured**. Ready to ship
+once it is, and not before.
+
+### The burger: Haiku can't get there with prompt rules
+
+h01's burger on production: median **850** against 2,100. Attempts, 10 runs each:
+
+    rules: patty sizes, steakhouse vs diner, sides    ~950-1075   no fries, ever
+    + a words-only "basis" field before calories       ~1,100      names fries, doesn't add them
+    + a numbered basis ("patty 800 + bun 300 + ...")  ~1,720      fixes it, breaks everything else
+
+The numbered basis is the only thing that worked, and on Haiku it is unshippable:
+easy 50 **17.2% -> 31.9%, sd 14**. Haiku's per-unit numbers are wrong and the
+sum amplifies them: egg whites at 60 kcal each (they're 17), beef at "700
+kcal/oz", half a cote de boeuf at 5,005. The rules-only variants also cost more
+than they bought. v26 scored hard 15.24% / easy 18.83% against 13.76% / 17.23%,
+and broke chain burgers (Five Guys little cheeseburger 550 -> 880) until a
+"chains use their published number" line was added.
+
+**Sonnet 5 does the sums correctly.** Same numbered-basis prompt, 5 runs: burger
+~1,640 ("10 oz patty 800 + brioche 280 + cheese 110 + fries 450"), h01 total
+**4,115** vs production's 2,958, cote de boeuf 1,320 (band 1,334-1,711),
+cacio e pepe + bread 1,140 (truth 1,200), Five Guys 490. The full-set Sonnet
+runs died on the credit balance, so this is a strong probe and **not yet a
+result**. It is `evals/variants/v25_numbered_basis.ts`, and it adds output tokens on top of
+Sonnet's 2.2x.
+
+### Next, once there are credits
+
+1. Easy 50 at n=10, production vs v27, run concurrently. If no regression,
+   ship v27.
+2. Sonnet + v25 on both sets at n=10. That is the burger fix and the
+   Haiku-vs-Sonnet decision in one measurement. The tier is Danny's call.
+
+---
+
 ## 2026-09-20 (last) — the restaurant-portion prompt ships, measured properly this time
 
 **Shipped: parse-meal v19**, carrying the prompt that the entry below could not

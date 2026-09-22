@@ -8,6 +8,13 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
+### Anthropic credits ran out, and food logging in the app is down (2026-09-21)
+Every parse returns "credit balance is too low". Top up at console.anthropic.com
+-> Plans & Billing. Then tell the next run whether to measure Sonnet 5 for
+the burger fix (BUILD_LOG 2026-09-21). Scoring it properly is ~$5.
+
+**Danny:**
+
 ### One dashboard toggle: leaked-password protection (30 seconds, yours to click)
 The Supabase security advisor is clean except for this one, and it's been there
 since email+password sign-in went in: **Authentication → Policies → "Leaked
