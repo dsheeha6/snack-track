@@ -1,10 +1,22 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 
 import { Brand } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/lib/auth-context';
 
 export default function TabsLayout() {
   const theme = useTheme();
+  const { session, loading } = useAuth();
+
+  // index.tsx is the only other gate, and it only runs on a cold start at "/".
+  // Without this, landing on /today directly (a web reload, or the phone
+  // resuming on the tab) after the session ended -- e.g. a global sign-out
+  // from another device -- rendered Today with no user: every query went out
+  // as anon, RLS returned no profile row, and .single() surfaced "Cannot
+  // coerce the result to a single JSON object" (2026-09-22).
+  if (loading) return null;
+  if (!session) return <Redirect href="/" />;
+
   return (
     <Tabs
       screenOptions={{
