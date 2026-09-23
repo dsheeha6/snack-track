@@ -5,6 +5,51 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-22 — the bread dedupe doesn't ship: it eats second helpings
+
+**Outcome: not deployed, prompt reverted. Production stays v20.** v20 (the
+restaurant work) is now committed and pushed as `0ccc27d`. It had been
+deployed without being committed.
+
+The v27 paragraph ("a general name beside a specific one for the same course
+is one item... tables get one bread service, not two") was moved onto v20's
+prompt and A/B'd with `evals/variants/ab_local.py` at 10 runs per arm, with
+both arms running concurrently:
+
+| set | v20 | v20 + dedupe |
+|---|---|---|
+| easy 50 | **17.13%** (sd 2.72) | 19.15% (sd 5.26) |
+| hard 20 | **13.46%** (sd 1.26) | 15.38% (sd 1.99) |
+
+`ab_local` sends no menus, so chain meals are estimated in both arms. That's
+fine for a prompt A/B but it isn't v20's production number.
+
+- **It does its job on h01 only partly now:** double bread in 10/10 runs to
+  4/10 (on v19 it was 0-1/10). h01's total falls further below truth, as
+  predicted (median 3,058 -> 2,573 vs ~4,960).
+- **The real reason it can't ship: it merges second helpings.** h15 ("chips
+  and salsa, then i kept going back for more chips") median **590 -> 430**,
+  error 18.2% -> 29.1%. That's the exact case the paragraph says it
+  protects. The 09-21 claim that h15 held was on v19 and doesn't hold here.
+  h07 (shared cote de boeuf) also fell 1,373 -> 1,213. The "one item" wording
+  pushes Haiku toward merging and smaller totals in general, which feeds the
+  undercount bias.
+- **Easy 50 regression is mostly m28** ("a dozen eggs worth of egg whites"),
+  which flips between ~60 and ~204 against a truth of 34. The dedupe arm hit
+  204 three times, which accounts for its three spiky runs (24.7/27.1/27.8).
+  That's noise on a tiny denominator, but it isn't evidence of a gain either.
+
+### Next
+
+1. **Haiku vs Sonnet 5 at `--repeat 10`**, now the top accuracy item. The
+   burger undercount needs it, and a model that does sums correctly may make
+   the bread duplicate moot.
+2. If the dedupe is retried, do it in code after the parse (collapse
+   generic+specific bread items), not with prompt wording that also reaches
+   repeat servings.
+
+---
+
 ## 2026-09-21 (later) — chain restaurants get their published numbers
 
 Danny, after the entry below: **accuracy is the top priority right now; pull the

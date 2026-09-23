@@ -369,7 +369,9 @@ target. Details under **Accuracy work** below.
 - [ ] **Haiku vs Sonnet 5 is not settled.** The 15.1% vs 10.2% gap recorded
       earlier on 09-20 is 4.9 points against a 6.1-point spread — it is not a
       result. Re-run both at `--repeat 10` before spending anything on the tier.
-- [ ] **The baguette / bread-service dedupe bug**, currently masked by the
+- [ ] **The baguette / bread-service dedupe bug.** The prompt fix was rejected
+      2026-09-22 (worse on both sets, and it merged h15's second helping of
+      chips; BUILD_LOG). If retried, do it in code, not prompt wording. Currently masked by the
       bias. Expect h01 to move oddly before it moves right.
 - [ ] **Never put eval-set dishes in the prompt.** The first v14 draft named
       pommes aligot, adjaruli khachapuri and the baguette/bread-service pair —
