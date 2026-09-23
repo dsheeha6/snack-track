@@ -366,7 +366,10 @@ target. Details under **Accuracy work** below.
       the same food named twice in one sentence is one item, while a second
       helping adds. The feared non-restaurant regression was itself noise — the
       easy 50 is almost entirely everyday food and shows none at n=10.
-- [ ] **Haiku vs Sonnet 5 is not settled.** The 15.1% vs 10.2% gap recorded
+- [x] **Haiku vs Sonnet 5, settled 2026-09-22 at 10 runs a side:** hard 20
+      16.1% -> 5.0%; easy 50 ties once m28's broken truth is excluded
+      (BUILD_LOG). Switching production is Danny's call.
+      *Original note:* The 15.1% vs 10.2% gap recorded
       earlier on 09-20 is 4.9 points against a 6.1-point spread — it is not a
       result. Re-run both at `--repeat 10` before spending anything on the tier.
 - [ ] **The baguette / bread-service dedupe bug.** The prompt fix was rejected

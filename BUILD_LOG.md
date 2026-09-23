@@ -5,6 +5,43 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-22 (later) — Haiku vs Sonnet 5, settled: Sonnet wins where it matters
+
+Same v20 prompt, `ab_local.py` with `PROBE_MODEL`, 10 runs per arm, both arms
+running concurrently. There are no menus in either arm, so chain meals are
+estimated.
+
+| set | Haiku 4.5 | Sonnet 5 |
+|---|---|---|
+| **hard 20** | 16.11% (sd 1.55) | **5.04% (sd 1.03)** |
+| easy 50 | **17.11%** (sd 3.55) | 21.21% (sd 2.54) |
+| easy 50 without m28 | 13.14% (sd 1.07) | 13.02% (sd 0.75) |
+
+- **Hard set: an 11-point cut** with non-overlapping spreads, so this one is
+  real. The biggest gains are exactly the undercount cases: office bagel
+  spread h11 391 -> 710 (truth ~950), pad thai h14 490 -> 730 (785), cacio e
+  pepe + bread h08 675 -> 940 (1,200), omakase h03 550 -> 830 (1,073). Sonnet
+  still undercounts, just by less.
+- **The easy-set loss is one broken answer.** m28 ("a dozen eggs worth of
+  egg whites, like 2 servings") has truth **34 kcal**, which is two egg
+  whites. Its own note says it means six (~100), and the literal reading is
+  twelve (~204). Sonnet answers ~202 and takes a 435% error on a 34 denominator,
+  and that alone moves its mean 13.0 -> 21.2. **m28's ground truth needs
+  fixing** (Danny's call on which reading; QUESTIONS.md). Without it the two
+  models tie, and Sonnet is steadier.
+- **Where Sonnet is worse:** it over-applies restaurant sizing to home food.
+  m45 "6 oz chicken with a chipotle-style rice bowl base" 665 -> 820 (487),
+  m29 "a big bowl of pasta with chicken" 735 -> 850 (582), m11 greek yogurt +
+  blueberries 215 -> 304 (210; it assumes whole-milk yogurt). That's the next
+  prompt target if Sonnet ships.
+- **Cost:** Sonnet used ~2,130 in / ~245 out tokens per meal vs Haiku's
+  ~1,860 / ~220, so it's the ~2.2x already on file (~$0.006 a meal, about
+  $0.90/month at Danny's rate). Chain parses add their menu on top.
+
+Not deployed: switching the production model is Danny's call.
+
+---
+
 ## 2026-09-22 — the bread dedupe doesn't ship: it eats second helpings
 
 **Outcome: not deployed, prompt reverted. Production stays v20.** v20 (the

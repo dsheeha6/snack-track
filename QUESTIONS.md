@@ -8,6 +8,16 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
+### m28's ground truth is wrong: which reading do you mean? (2026-09-22)
+"a dozen eggs worth of egg whites, like 2 servings" is scored against **34
+kcal**, which is two egg whites. That matches no reading: its note says six
+whites (~100 kcal), and the literal words say twelve (~204). Sonnet answers
+~202 and gets a 435% error, which alone decides the easy-set score. Pick one:
+twelve whites (~204, my recommendation, since that's what the sentence says)
+or six (~100).
+
+**Danny:**
+
 ### Two calls on the restaurant data (2026-09-21)
 1. ~~CAVA PDF~~ answered 2026-09-21: yes, downloaded and parsed.
 2. **Most chains come via Nutritionix's public pages.** The numbers match the
