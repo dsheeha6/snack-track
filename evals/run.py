@@ -45,7 +45,7 @@ PROTOTYPE_DIR = REPO_ROOT.parent / "calorie-tracker"
 
 MACROS = ("calories", "protein", "carbs", "fat")
 
-DEFAULT_MODEL = "claude-haiku-4-5"
+DEFAULT_MODEL = "claude-sonnet-5"  # production since 2026-09-22
 
 # Transient failures to ride out rather than abandon a run for.
 RETRIES = 4
@@ -340,7 +340,7 @@ def main():
     ap.add_argument("--json", default=None, help="write full per-meal results to this path")
     ap.add_argument("--model", default=DEFAULT_MODEL,
                     help=f"claude pipeline only (default {DEFAULT_MODEL})")
-    ap.add_argument("--resolve", choices=["none", "estimate", "db"], default="none",
+    ap.add_argument("--resolve", choices=["none", "estimate", "db", "foods"], default="none",
                     help="claude pipeline only: whether a `foods` match overrides "
                          "Claude's numbers (default none - score the parse alone)")
     ap.add_argument("--no-menus", action="store_true",

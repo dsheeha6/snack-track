@@ -5,6 +5,68 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-22 (evening) — Sonnet is live; database-first parse built, measured, left off
+
+**Production is parse-meal v22 on `claude-sonnet-5`** (Danny's go-ahead). The
+app still sends `resolve: 'estimate'`, so the only live changes are the model,
+the burger-counting rule below, and model override now being limited to
+service_role (a signed-in user could previously pick Opus on our key).
+
+### Live numbers, v21/v22 against the deployed function, menus on
+
+| set, 5 runs | current (`estimate`) | database-first (`foods`) |
+|---|---|---|
+| easy 50 | **15.0%** (sd 1.0) | 15.7% (sd 0.9) |
+| hard 20 | **4.3%** (sd 0.9) | 4.6% (sd 1.0) |
+| 7 chain meals (v22) | **0.0%, 35 of 35 parses** | — |
+| cost / meal | ~$0.008 | ~$0.010 |
+
+(The easy 50 is higher here than the 13.0% in the entry below because this
+run includes the chain menus and the old m42 double count; see next section.)
+
+### Sonnet broke one chain meal; fixed in v22
+
+Sonnet built "a five guys little cheeseburger" as 2 patties + 2 cheese, and
+sometimes 2 buns: **1,224 against 612** in every run, where Haiku had been
+exact. The Five Guys menu is parts only, and Sonnet assumed the regular
+two-patty build. One general line added to `MENU_RULES` (one bun per burger or
+sandwich; "little/single/junior/small" is one patty) fixed it: all 7 chain
+meals exact in 35 of 35 parses. MENU_RULES only goes out when a chain is
+detected, so no other meal can move.
+
+Separately, "big mac" with no chain name doesn't load McDonald's menu (the
+alias list has chain names, not item names). The estimate is 793 vs 810, so
+it's low priority but worth an item-name alias pass later.
+
+### Database-first parse (`resolve: "foods"`): built, not switched on
+
+Danny asked for the AI to check our database before estimating. Built the same
+way as the chain menus:
+
+- `public.food_candidates(words[])` (migration `food_candidates_tighten`):
+  up to 15 SR Legacy rows per food word in the sentence, ranked by overlap
+  with the other words, 80 max. It excludes SR Legacy's per-100 g restaurant
+  rows ("SUBWAY, turkey sub" 147). Authenticated + service_role only; the
+  security advisor is unchanged.
+- The model gets them as numbered F-lines and returns `food_line` + `grams`,
+  and code computes row × grams / 100. A result more than 3x off the model's
+  own estimate falls back to the estimate (`food_rejected`).
+- **Why not `resolve_food`:** its single best guess is often the wrong variant
+  for numbers ('white rice' -> glutinous, 'chicken breast' -> deli roll,
+  'whole milk' -> buttermilk). It's fine as a provenance link and wrong as a
+  calorie source. That's also why the old `db` mode lost.
+
+It works mechanically: 6 oz chicken + rice + greek yogurt + blueberries picked
+roasted chicken breast, medium-grain cooked rice, raw blueberries. **It doesn't
+move accuracy** (table above), and it costs ~3k more input tokens a meal.
+**Why:** Sonnet's per-gram numbers for plain foods were already right. The
+remaining error is portion (how much is "2 tortillas with a scoop of black
+beans", "2 waffles"), and a database can't answer that. It stays deployed as
+an opt-in mode. It's the plumbing Phase 5b (user-contributed foods) needs,
+since a community row only helps if the parse can pick it.
+
+---
+
 ## 2026-09-22 (later) — Haiku vs Sonnet 5, settled: Sonnet wins where it matters
 
 Same v20 prompt, `ab_local.py` with `PROBE_MODEL`, 10 runs per arm, both arms

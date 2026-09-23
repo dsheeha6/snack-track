@@ -9,17 +9,16 @@
 // callers (verify_jwt, below), because an open endpoint holding an API key is a
 // stranger's free Claude account.
 //
-// Model: claude-haiku-4-5. Danny's call 2026-09-13. The parse is reading
-// comprehension over one short sentence, which is what the baseline was actually
-// bad at (typos 61.0% error, word-numbers 56.8%, restaurant items 36.4%) while
-// its nutrition table was fine (3.8-4.3% on explicit-quantity meals). Whether
-// Haiku is enough is a measured question, not an assumed one — evals/run.py
-// scores it against the 19.8% baseline and --model swaps the tier.
+// Model: claude-sonnet-5 since 2026-09-22 (Haiku 4.5 before that). Measured at
+// 10 runs a side on the same prompt: hard 20 16.1% -> 5.0% mean calorie error,
+// easy 50 13.8% -> 13.0%. Haiku undercounted restaurant food in a way prompt
+// rules couldn't fix. Cost is ~2.2x, about $0.006 a meal. evals/run.py --model
+// still swaps the tier for comparisons; only service_role may override it.
 
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const DEFAULT_MODEL = "claude-haiku-4-5";
+const DEFAULT_MODEL = "claude-sonnet-5";
 const MACROS = ["calories", "protein", "carbs", "fat"] as const;
 
 // Strict tool use rather than output_config.format: the raw JSON shape is
@@ -78,6 +77,16 @@ const LOG_MEAL_TOOL = {
                 additionalProperties: false,
               },
             },
+            food_line: {
+              type: "integer",
+              description:
+                "Only when a FOOD DATABASE is provided: the F-number of the row that IS this food as eaten. 0 when none fits or no list was given.",
+            },
+            grams: {
+              type: "number",
+              description:
+                "Edible weight eaten, in grams, as served (cooked weight for cooked food). Your best estimate; always fill it.",
+            },
           },
           required: [
             "name",
@@ -89,6 +98,8 @@ const LOG_MEAL_TOOL = {
             "fat",
             "confidence",
             "menu",
+            "food_line",
+            "grams",
           ],
           additionalProperties: false,
         },
@@ -153,6 +164,8 @@ type Item = {
   fat: number;
   confidence: "high" | "medium" | "low";
   menu?: { line: number; count: number }[];
+  food_line?: number;
+  grams?: number;
 };
 
 // ---------- restaurant menus ----------
@@ -294,11 +307,86 @@ that make it up and a count for each; those numbers replace your estimate.
 - Build-your-own orders (bowls, burritos, salads, pizzas, burgers listed as
   parts) are several lines: one per component named, plus the standard
   components that item always comes with. "Double" is count 2, "light" 0.5.
+- Counts are per what was ordered. One burger or sandwich has one bun or one
+  bread, whatever else is doubled. "Little", "single", "junior" and "small"
+  burgers are one patty (and one cheese slice for a cheeseburger); only the
+  chain's standard or "double" burger gets two.
 - A combo or meal is its parts: the entree, the side and the drink.
 - Only for food that came from the chain. A chain's name can also be an
   ordinary word ("chipotle mayo" is a sauce); food the person made or got
   elsewhere gets an empty "menu".
 - If nothing on the menu matches, leave "menu" empty and estimate as usual.
+Still fill calories/protein/carbs/fat with your own estimate either way.`;
+
+// ---------- generic foods (resolve: "foods") ----------
+//
+// Same idea as the menus, for everyday food: the model picks a USDA row and
+// says how many grams, and the calories come from the row. Not resolve_food's
+// single best guess, which is often the wrong variant for numbers ('white
+// rice' -> glutinous, 'chicken breast' -> deli roll). food_candidates returns
+// a short list per food word, and the model picks the row or none.
+
+type FoodRow = {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+};
+
+// Words that never name a food on their own; each one would pull ~15 junk
+// rows ("bowl" -> chili bowls, "grilled" -> grilled steak).
+const FOOD_STOP = new Set([
+  "bowl", "cup", "cups", "plate", "glass", "bag", "box", "container", "serving", "servings",
+  "piece", "pieces", "slice", "slices", "handful", "scoop", "tablespoon", "tbsp", "teaspoon",
+  "tsp", "ounce", "ounces", "gram", "grams", "pound", "lbs", "big", "little", "few", "bunch",
+  "grilled", "fried", "baked", "roasted", "steamed", "boiled", "scrambled", "toasted",
+  "homemade", "leftover", "breakfast", "lunch", "dinner", "snack", "ate", "eat", "was",
+  "about", "like", "maybe", "half", "dozen", "couple", "worth", "top", "side", "extra",
+  "after", "before", "morning", "night", "today", "place", "went", "made", "just", "really",
+  "pretty", "hard", "good", "day", "time", "gym", "game", "office", "work", "friend", "mom",
+  "dad", "roommate", "girlfriend", "boyfriend", "wife", "husband", "split", "shared",
+]);
+
+function foodWords(text: string, skip: string[]) {
+  const out = new Set<string>();
+  const drop = new Set(skip.flatMap(stems));
+  for (const w0 of normalise(text).split(/[^a-z]+/)) {
+    if (w0.length < 3 || STOP.has(w0) || FOOD_STOP.has(w0)) continue;
+    const w = w0.endsWith("ies") ? w0.slice(0, -3) + "y"
+      : w0.endsWith("oes") ? w0.slice(0, -2)
+      : w0.length > 3 && w0.endsWith("s") && !w0.endsWith("ss") ? w0.slice(0, -1)
+      : w0;
+    if (!drop.has(w) && !FOOD_STOP.has(w)) out.add(w);
+  }
+  return [...out].slice(0, 8);
+}
+
+// deno-lint-ignore no-explicit-any
+async function loadFoods(db: any, text: string, chainNames: string[]) {
+  const words = foodWords(text, chainNames);
+  if (!words.length) return { rows: [] as FoodRow[], text: "" };
+  const { data } = await db.rpc("food_candidates", { words, per_word: 15, max_rows: 80 });
+  const rows: FoodRow[] = data ?? [];
+  const listing = rows
+    .map((r, i) => `F${i + 1} | ${r.name} | ${Math.round(Number(r.calories))} cal per 100 g`)
+    .join("\n");
+  return { rows, text: listing };
+}
+
+const FOOD_RULES = `FOOD DATABASE (USDA, per 100 g)
+Rows from a nutrition database that may match foods in the sentence. For each
+item that is plainly one of these foods, set "food_line" to its F-number and
+"grams" to the edible weight eaten; the database numbers replace your estimate.
+- The row must be the food as eaten: cooked vs raw (rice and pasta are eaten
+  cooked), plain vs flavored, whole vs skim, the right cut. A near miss is
+  worse than no match: if the right variant isn't listed, use 0.
+- One row per item. A mixed or named dish (a burrito, a stir fry, lasagna), or
+  anything from a restaurant kitchen, gets 0 unless a row is that exact dish;
+  estimate it as usual.
+- grams is the weight of what was eaten, using standard household weights for
+  counts and cups, and the same portion judgment you'd use for calories.
 Still fill calories/protein/carbs/fat with your own estimate either way.`;
 
 function corsHeaders(origin: string | null) {
@@ -448,8 +536,11 @@ Deno.serve(async (req) => {
   // "estimate" — Claude's numbers stand, the database only attaches provenance.
   // "db"       — a confident database match overrides Claude's numbers.
   // "none"     — skip the lookup entirely.
+  // "foods"    — the model picks a USDA row + grams and the row's numbers stand.
   const resolveMode = body.resolve ?? "estimate";
-  const model = body.model ?? DEFAULT_MODEL;
+  // Only the eval harness (service_role) may pick the model. A signed-in user
+  // choosing Opus on our key is a cost hole, not a feature.
+  const model = role === "service_role" && body.model ? body.model : DEFAULT_MODEL;
 
   // An API key created at the org level rather than inside a workspace is not
   // scoped to one, and the Messages API then requires the workspace to be named
@@ -512,17 +603,25 @@ Deno.serve(async (req) => {
     }
   }
 
+  let foods: { rows: FoodRow[]; text: string } = { rows: [], text: "" };
+  if (resolveMode === "foods") {
+    try {
+      foods = await loadFoods(db, text, chains.map((c) => c.name));
+    } catch {
+      // A lookup failure costs accuracy, never the parse.
+    }
+  }
+
+  const system = [{ type: "text" as const, text: SYSTEM }];
+  if (menu.rows.length) system.push({ type: "text", text: `${MENU_RULES}\n\n${menu.text}` });
+  if (foods.rows.length) system.push({ type: "text", text: `${FOOD_RULES}\n\n${foods.text}` });
+
   let response;
   try {
     response = await anthropic.messages.create({
       model,
       max_tokens: 2000,
-      system: menu.rows.length
-        ? [
-          { type: "text", text: SYSTEM },
-          { type: "text", text: `${MENU_RULES}\n\n${menu.text}` },
-        ]
-        : SYSTEM,
+      system,
       tools: [LOG_MEAL_TOOL],
       tool_choice: { type: "tool", name: "log_meal" },
       messages: [{ role: "user", content: text }],
@@ -588,7 +687,34 @@ Deno.serve(async (req) => {
         .join(" + ");
     }
 
-    if (source === "estimate" && resolveMode !== "none" && it.search_term) {
+    // A picked USDA row times the grams eaten. Guarded both ways: a line that
+    // doesn't exist, or a result more than 3x off the model's own estimate,
+    // means a misread row or a unit slip, and the estimate is the safer number.
+    let foodRejected = false;
+    if (source === "estimate" && foods.rows.length && it.food_line && it.food_line > 0) {
+      const row = foods.rows[it.food_line - 1];
+      const g = Number(it.grams);
+      if (row && g > 0 && g <= 3000) {
+        const f = g / 100;
+        const cand = {
+          calories: Number(row.calories) * f,
+          protein: Number(row.protein) * f,
+          carbs: Number(row.carbs) * f,
+          fat: Number(row.fat) * f,
+        };
+        const ratio = it.calories > 0 ? cand.calories / it.calories : 1;
+        if (ratio >= 1 / 3 && ratio <= 3) {
+          macros = cand;
+          source = "database";
+          foodId = row.id;
+          matchedName = `${row.name} (${Math.round(g)} g)`;
+        } else {
+          foodRejected = true;
+        }
+      }
+    }
+
+    if (source === "estimate" && resolveMode !== "none" && resolveMode !== "foods" && it.search_term) {
       try {
         const supabase = db;
         // resolve_food, not search_foods: search is built for recall and a
@@ -638,6 +764,9 @@ Deno.serve(async (req) => {
       // menu moved it. Not shown in the app.
       ...(source === "restaurant"
         ? { estimate_calories: round1(it.calories), menu_lines: picks }
+        : {}),
+      ...(resolveMode === "foods"
+        ? { estimate_calories: round1(it.calories), grams: it.grams, food_rejected: foodRejected }
         : {}),
     });
   }

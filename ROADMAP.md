@@ -368,7 +368,15 @@ target. Details under **Accuracy work** below.
       easy 50 is almost entirely everyday food and shows none at n=10.
 - [x] **Haiku vs Sonnet 5, settled 2026-09-22 at 10 runs a side:** hard 20
       16.1% -> 5.0%; easy 50 ties once m28's broken truth is excluded
-      (BUILD_LOG). Switching production is Danny's call.
+      (BUILD_LOG). **Switched 2026-09-22, live as parse-meal v22.**
+- [x] **Database-first parse (`resolve: "foods"`)**, built 2026-09-22 at
+      Danny's request. Not a win live (easy 15.0% -> 15.7%, hard 4.3% ->
+      4.6%, +25% cost), so the app stays on `estimate`. Kept as the lookup
+      path Phase 5b's community foods will plug into.
+- [ ] **Remaining error is portion, not food identity.** The worst easy-set
+      meals (tortillas + beans, waffles, pancakes, "a big bowl of pasta")
+      have the right food and the wrong amount. This is the next accuracy
+      target.
       *Original note:* The 15.1% vs 10.2% gap recorded
       earlier on 09-20 is 4.9 points against a 6.1-point spread — it is not a
       result. Re-run both at `--repeat 10` before spending anything on the tier.
@@ -521,6 +529,55 @@ Where it already touches the plan:
 - [ ] The two guardrails: nothing under ~200 cal left, never suggest past the target
 
 **Done when:** the cards fit the shape of the remaining macros, not just the calories.
+
+---
+
+## Phase 5b — User-contributed foods (Danny's call 2026-09-22)
+
+**Goal:** what users log makes the database better for everyone, without
+turning it into MyFitnessPal's 40 bananas. Danny's constraint, in his words:
+no "ton of dupes or inaccurate things or weird items that aren't food."
+
+**The model: private first, shared only when earned.** Every user already has
+`personal_foods` (their corrections, used ahead of any estimate). A food moves
+from someone's private list to the shared database only after it passes every
+gate below. Nobody writes to `foods` directly.
+
+- [ ] **Submissions table**, not writes to `foods`: `food_submissions` (user,
+      name, brand, barcode, serving label + grams, macros, source phrase,
+      status `pending | promoted | merged | rejected`). RLS: a user sees and
+      edits only their own; promotion runs as service_role.
+- [ ] **Gate 1, the numbers add up.** Calories within ~15% of 4P + 4C + 9F
+      (alcohol exempt, same check as `scripts/restaurants/common.py`); per-100 g
+      calories between 0 and 900; no negative or absurd macros.
+- [ ] **Gate 2, it's food.** One cheap model check per new name: is this a
+      food or drink, is the name clean (no jokes, slurs, "asdf"), and are the
+      numbers plausible for it? Rejects are silent to the user, and the item
+      stays in their private list.
+- [ ] **Gate 3, not a duplicate.** Before anything is created, match against
+      `foods` and pending submissions by barcode first (exact), then
+      normalised name + brand with trigram similarity, then macros within ~10%.
+      A match **adds a vote** to the existing row instead of creating one.
+- [ ] **Gate 4, independent agreement.** A new shared row needs 3+ distinct
+      users whose numbers agree (median, outliers dropped). One person's entry
+      never reaches anyone else.
+- [ ] **Trust order in lookups:** USDA / official chain numbers > promoted
+      community rows > estimate. Community rows carry `source = 'community'`
+      and are labeled that way in the app. `food_candidates` and
+      `resolve_food` learn to include them *after* the verified sources.
+- [ ] **Review queue for Danny:** anything that passes the gates but sits near
+      a threshold, plus anything reported, lands in a small admin list to
+      approve, merge or reject.
+- [ ] **Barcode scanning is the multiplier.** A scanned barcode is the one
+      duplicate check that can't be fooled, and the 399k branded rows already
+      carry barcodes. Scope it with this phase, not after.
+
+**Depends on:** the database-first parse (Accuracy work, 2026-09-22), which is
+what lets a promoted row actually change the numbers people get.
+
+**Done when:** a food three test accounts log with matching numbers shows up in
+a fourth account's parse as `community`, a joke entry from one account never
+leaves that account, and a near-duplicate merges instead of creating a row.
 
 ---
 
