@@ -40,6 +40,12 @@ estimated.
 
 Not deployed: switching the production model is Danny's call.
 
+**Update, same day:** Danny OK'd fixing m28. It's now the literal reading,
+twelve whites = **204 kcal** (USDA 01124). Rescoring the runs above against it,
+the easy 50 comes out **Haiku 13.81% (sd 1.41), Sonnet 12.98% (sd 0.88)**. Sonnet
+is now ahead on both sets. Scores on the easy 50 from before today used the old
+answer, so they aren't directly comparable.
+
 ---
 
 ## 2026-09-22 — the bread dedupe doesn't ship: it eats second helpings
