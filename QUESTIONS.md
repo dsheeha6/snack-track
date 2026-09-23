@@ -8,10 +8,13 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
-### Anthropic credits ran out, and food logging in the app is down (2026-09-21)
-Every parse returns "credit balance is too low". Top up at console.anthropic.com
--> Plans & Billing. Then tell the next run whether to measure Sonnet 5 for
-the burger fix (BUILD_LOG 2026-09-21). Scoring it properly is ~$5.
+### Two calls on the restaurant data (2026-09-21)
+1. ~~CAVA PDF~~ answered 2026-09-21: yes, downloaded and parsed.
+2. **Most chains come via Nutritionix's public pages.** The numbers match the
+   chains' own feeds exactly, but Nutritionix sells this as an API, and its
+   terms likely don't allow scraping for a commercial app. Fine for building and
+   testing. Before launch it's your call: license it, or replace each chain with
+   its own site as the Chipotle/McDonald's/Chick-fil-A fetchers do.
 
 **Danny:**
 

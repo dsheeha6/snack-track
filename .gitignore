@@ -17,3 +17,5 @@ evals/*_results.json
 evals/hard_*.json
 evals/easy_*.json
 !evals/hard_source.json
+# A/B arm transcripts from ab runs; the numbers go in BUILD_LOG.md
+evals/log_*.txt

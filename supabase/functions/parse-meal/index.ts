@@ -64,6 +64,20 @@ const LOG_MEAL_TOOL = {
               description:
                 "high = standard item with a stated amount; medium = amount assumed from a typical serving; low = genuinely unknowable, e.g. an unspecified homemade dish.",
             },
+            menu: {
+              type: "array",
+              description:
+                "Only when a RESTAURANT MENU is provided and this item comes from it: the menu lines that make up this item and how many of each. Empty array otherwise.",
+              items: {
+                type: "object",
+                properties: {
+                  line: { type: "integer", description: "The L-number of the menu line." },
+                  count: { type: "number", description: "How many of that line. 2 for double, 0.5 for half." },
+                },
+                required: ["line", "count"],
+                additionalProperties: false,
+              },
+            },
           },
           required: [
             "name",
@@ -74,6 +88,7 @@ const LOG_MEAL_TOOL = {
             "carbs",
             "fat",
             "confidence",
+            "menu",
           ],
           additionalProperties: false,
         },
@@ -137,7 +152,154 @@ type Item = {
   carbs: number;
   fat: number;
   confidence: "high" | "medium" | "low";
+  menu?: { line: number; count: number }[];
 };
+
+// ---------- restaurant menus ----------
+//
+// For chain food, the chain's own published numbers beat any estimate, and the
+// 2026-09-21 A/B showed Haiku's arithmetic can't be trusted to add parts up
+// (egg whites at 60 kcal each, a 5,005 kcal half-steak). So when the sentence
+// names a chain we have, the model gets that chain's menu and only *picks
+// lines and counts*; the numbers are computed here from public.restaurant_items.
+
+type MenuRow = {
+  chain_slug: string;
+  category: string;
+  item: string;
+  size: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+};
+
+const MAX_CHAINS = 2;
+let chainCache: { at: number; rows: { slug: string; name: string; aliases: string[] }[] } | null =
+  null;
+
+// Aliases that are also ordinary words. "chipotle mayo", "took the subway",
+// "three chilis", "candy canes", "a glass of cava", "in and out of meetings".
+// These only count with restaurant context around them.
+const AMBIGUOUS = new Set([
+  "chipotle", "subway", "sonic", "chilis", "chili's", "canes", "cane's", "cava",
+  "in and out", "in n out", "firehouse", "jj", "dominos", "domino's", "panda",
+  "wawa", "sheetz", "potbelly", "noodles",
+]);
+const CONTEXT_BEFORE = "(?:at|from|to|got|get|ordered|grabbed|hit|went to|stopped at|drive thru|drive through)\\s+(?:the\\s+|a\\s+)?";
+// ...or an order word within four words after: "chipotle chicken bowl",
+// "canes box combo", "panda orange chicken", "in n out double double".
+const CONTEXT_AFTER = "(?:'s|s)?(?:\\s+[a-z0-9']+){0,4}?\\s+(?:bowls?|burritos?|order|run|drive thru|drive through|meal|combo|box|footlong|sub|tacos?|quesadilla|double double|animal style|orange chicken|chow mein|fried rice|plate|bigger plate|caniac|nuggets|fries|lemonade|limeade|slush|pizza|slices?|pita|queso|guac)";
+
+function normalise(s: string) {
+  return s.toLowerCase().replace(/[’‘`]/g, "'");
+}
+
+function escapeRe(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// deno-lint-ignore no-explicit-any
+async function findChains(db: any, text: string) {
+  if (!chainCache || Date.now() - chainCache.at > 10 * 60 * 1000) {
+    const { data } = await db.from("restaurant_chains").select("slug, name, aliases");
+    chainCache = { at: Date.now(), rows: data ?? [] };
+  }
+  const t = normalise(text);
+  const bare = t.replace(/[^a-z0-9 ]/g, "");
+  const hits: { slug: string; name: string; at: number }[] = [];
+  for (const c of chainCache.rows) {
+    let at = -1;
+    for (const a of c.aliases) {
+      const e = escapeRe(a);
+      const re = AMBIGUOUS.has(a)
+        ? new RegExp(`(?:(^|[^a-z0-9])${CONTEXT_BEFORE}${e}($|[^a-z0-9])|(^|[^a-z0-9])${e}${CONTEXT_AFTER}($|[^a-z0-9])|^${e}(?:'s)?\\s*(?:[-,:]|$))`)
+        : new RegExp(`(^|[^a-z0-9])${e}($|[^a-z0-9])`);
+      const m = re.exec(t) ?? re.exec(bare);
+      if (m && (at < 0 || m.index < at)) at = m.index;
+    }
+    if (at >= 0) hits.push({ slug: c.slug, name: c.name, at });
+  }
+  return hits.sort((a, b) => a.at - b.at).slice(0, MAX_CHAINS);
+}
+
+// Whole menus go in when small. Big ones (Starbucks is 2,000+ rows, every size
+// and milk) are cut to the lines sharing a word with the sentence, or the
+// prompt balloons to ~30k tokens a parse.
+const MENU_WHOLE = 250;
+// 300 sent a "starbucks grande latte" parse 15.8k input tokens (2026-09-21);
+// rows are ranked by words shared with the sentence, so 150 keeps every line
+// that could plausibly match and halves the prompt.
+const MENU_CAP = 150;
+const STOP = new Set(["and", "the", "with", "from", "had", "got", "for", "some", "one", "two",
+  "large", "small", "medium", "regular", "meal", "combo", "order", "plus", "then", "that"]);
+
+function stems(s: string) {
+  return normalise(s).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOP.has(w))
+    .map((w) => (w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w));
+}
+
+function trimMenu(rows: MenuRow[], text: string, chainNames: string[]) {
+  if (rows.length <= MENU_WHOLE) return rows;
+  const skip = new Set(chainNames.flatMap(stems));
+  const want = new Set(stems(text).filter((w) => !skip.has(w)));
+  const scored = rows
+    .map((r) => {
+      const words = new Set(stems(`${r.item} ${r.size} ${r.category}`));
+      let score = 0;
+      for (const w of want) if (words.has(w)) score++;
+      return { r, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+  return scored.slice(0, MENU_CAP).map((x) => x.r);
+}
+
+// deno-lint-ignore no-explicit-any
+async function loadMenu(db: any, chains: { slug: string; name: string }[], text: string) {
+  const rows: MenuRow[] = [];
+  for (const c of chains) {
+    // PostgREST caps a response at 1,000 rows, so page: a silent truncation
+    // would drop the back half of Starbucks' menu with no error at all.
+    const all: MenuRow[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data } = await db
+        .from("restaurant_items")
+        .select("chain_slug, category, item, size, calories, protein, carbs, fat")
+        .eq("chain_slug", c.slug)
+        .order("category")
+        .order("item")
+        .order("size")
+        .range(from, from + 999);
+      all.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+    rows.push(...trimMenu(all, text, [c.name]));
+  }
+  const names = Object.fromEntries(chains.map((c) => [c.slug, c.name]));
+  const listing = rows
+    .map((r, i) =>
+      `L${i + 1} | ${names[r.chain_slug]} | ${r.category} | ${r.item}${r.size ? ` (${r.size})` : ""} | ${Math.round(Number(r.calories))} cal`
+    )
+    .join("\n");
+  return { rows, text: listing };
+}
+
+const MENU_RULES = `RESTAURANT MENU
+The sentence names a chain whose official published nutrition is listed below.
+For every food or drink that came from that chain, fill "menu" with the lines
+that make it up and a count for each; those numbers replace your estimate.
+- Pick the line that matches what was ordered, including size. When no size is
+  said, take the regular/default one (a medium, or the line with no size).
+- Build-your-own orders (bowls, burritos, salads, pizzas, burgers listed as
+  parts) are several lines: one per component named, plus the standard
+  components that item always comes with. "Double" is count 2, "light" 0.5.
+- A combo or meal is its parts: the entree, the side and the drink.
+- Only for food that came from the chain. A chain's name can also be an
+  ordinary word ("chipotle mayo" is a sauce); food the person made or got
+  elsewhere gets an empty "menu".
+- If nothing on the menu matches, leave "menu" empty and estimate as usual.
+Still fill calories/protein/carbs/fat with your own estimate either way.`;
 
 function corsHeaders(origin: string | null) {
   return {
@@ -269,6 +431,8 @@ Deno.serve(async (req) => {
     resolve?: string;
     model?: string;
     debug?: boolean;
+    /** false = skip restaurant menus, for A/B-ing them in evals/run.py. */
+    menus?: boolean;
   };
   try {
     body = await req.json();
@@ -329,12 +493,36 @@ Deno.serve(async (req) => {
       : {}),
   });
 
+  // Caller's own JWT, so RLS applies exactly as it does in the app. Shared by
+  // the menu lookup here and resolve_food below.
+  const db = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+
+  let menu: { rows: MenuRow[]; text: string } = { rows: [], text: "" };
+  let chains: { slug: string; name: string }[] = [];
+  if (body.menus !== false) {
+    try {
+      chains = await findChains(db, text);
+      if (chains.length) menu = await loadMenu(db, chains, text);
+    } catch {
+      // A menu lookup failure costs accuracy, never the parse.
+    }
+  }
+
   let response;
   try {
     response = await anthropic.messages.create({
       model,
       max_tokens: 2000,
-      system: SYSTEM,
+      system: menu.rows.length
+        ? [
+          { type: "text", text: SYSTEM },
+          { type: "text", text: `${MENU_RULES}\n\n${menu.text}` },
+        ]
+        : SYSTEM,
       tools: [LOG_MEAL_TOOL],
       tool_choice: { type: "tool", name: "log_meal" },
       messages: [{ role: "user", content: text }],
@@ -376,13 +564,33 @@ Deno.serve(async (req) => {
       fat: it.fat,
     };
 
-    if (resolveMode !== "none" && it.search_term) {
+    // Menu lines win outright: they are the chain's published numbers, summed
+    // here rather than by the model. Any invalid line voids the whole pick, so
+    // a half-understood order falls back to the estimate instead of silently
+    // dropping a component.
+    const picks = (it.menu ?? []).filter((p) => p && p.count > 0);
+    const valid = picks.length > 0 &&
+      picks.every((p) => Number.isInteger(p.line) && p.line >= 1 && p.line <= menu.rows.length && p.count <= 20);
+    if (valid) {
+      const sum = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+      for (const p of picks) {
+        const r = menu.rows[p.line - 1];
+        for (const k of MACROS) sum[k] += Number(r[k]) * p.count;
+      }
+      macros = sum;
+      source = "restaurant";
+      matchedName = picks
+        .map((p) => {
+          const r = menu.rows[p.line - 1];
+          const label = `${r.item}${r.size ? ` (${r.size})` : ""}`;
+          return p.count === 1 ? label : `${p.count}x ${label}`;
+        })
+        .join(" + ");
+    }
+
+    if (source === "estimate" && resolveMode !== "none" && it.search_term) {
       try {
-        const supabase = createClient(
-          Deno.env.get("SUPABASE_URL")!,
-          Deno.env.get("SUPABASE_ANON_KEY")!,
-          { global: { headers: { Authorization: authHeader } } },
-        );
+        const supabase = db;
         // resolve_food, not search_foods: search is built for recall and a
         // human picking from a list, and its top hit is wrong often enough to
         // be dangerous here (2026-09-14: 'apple' -> PINEAPPLE SALSA, 'chicken'
@@ -422,10 +630,15 @@ Deno.serve(async (req) => {
       carbs: round1(macros.carbs),
       fat: round1(macros.fat),
       source,
-      confidence: it.confidence,
+      confidence: source === "restaurant" ? "high" : it.confidence,
       food_id: foodId,
       matched_name: matchedName,
-      note: it.confidence === "low" ? "rough estimate" : "",
+      note: source === "restaurant" ? "" : it.confidence === "low" ? "rough estimate" : "",
+      // What the model itself guessed, kept so evals can measure how far the
+      // menu moved it. Not shown in the app.
+      ...(source === "restaurant"
+        ? { estimate_calories: round1(it.calories), menu_lines: picks }
+        : {}),
     });
   }
 
@@ -441,6 +654,7 @@ Deno.serve(async (req) => {
       totals,
       meal,
       questions: [],
+      chains: chains.map((c) => c.name),
       model,
       usage: {
         input_tokens: response.usage.input_tokens,

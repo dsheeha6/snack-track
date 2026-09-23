@@ -5,6 +5,117 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-21 (later) — chain restaurants get their published numbers
+
+Danny, after the entry below: **accuracy is the top priority right now; pull the
+chains' own calorie data instead of estimating it.** Shipped as **parse-meal v20**
+once Danny added API credits, then measured.
+
+### Result
+
+| set | with menus | without (`--no-menus`) |
+|---|---|---|
+| **7 chain meals, 10 runs** | **0.0% error, every one of 70 parses** | 4.7-8.8% per run |
+| easy 50, 10 runs | 16.9% mean, 5.6% median | 17.2% mean, 7.3% median |
+| hard 20, 10 runs | 16.3% | 15.3% |
+
+- **Chain meals are now exact.** Chipotle bowl 630 = chicken + white rice +
+  black beans + cheese; Five Guys little cheeseburger 612 = bun + patty +
+  cheese; Panda orange chicken + fried rice 1130. Without menus the same model
+  was off by up to 18.6% (Panda, 920 vs 1130).
+- **Nothing else moved.** No hard-set meal triggered a menu, so its two arms ran
+  identical code. The 1.0-point gap between them is run-to-run noise, a free
+  calibration. On the easy 50 the chain meals are 7 of 50, so the mean moves
+  inside noise; the median error fell 7.3% -> 5.6%.
+- **No false positives:** "6 oz chicken with a chipotle-style rice bowl base"
+  (m45) correctly got no Chipotle menu.
+- Cost: a chain parse carries its menu, $0.0034/meal vs $0.0026 on the easy 50.
+  Starbucks was the outlier at 15.8k input tokens ("latte" matches hundreds of
+  lines), so `MENU_CAP` went 300 -> 150.
+
+### Coverage: 66 chains, ~15,800 rows
+
+A completeness check (`check_complete.py`, listing vs saved) found 9 chains
+short. Item pages had failed under three parallel jobs and been dropped
+silently (Pizza Hut 96 of 263). `nix.brand_rows` now retries failures serially
+and prints any that still fail, and the nine were re-fetched.
+
+### What was wrong before, measured
+
+- `public.foods` had essentially no restaurant data: "chipotle" matched
+  chipotle seasoning, Five Guys/Sweetgreen/CAVA had zero rows, and the few
+  restaurant rows (old USDA) are **per 100 g** ("CHICK-FIL-A, chicken sandwich
+  249" is 100 g of sandwich).
+- **The eval set's own chain answers were stale in 5 of 7 meals.** Re-taken
+  from current official data: m39 Big Mac + small fry 780 -> 810 (Big Mac is
+  580 now), m40 CFA sandwich + fries 860 -> 840, m42 Five Guys little
+  cheeseburger 550 -> 612, m43 Panda orange chicken + fried rice 1010 -> 1130
+  (fried rice is 620), m44 Subway 6" turkey 280 -> 270. Each line's `note`
+  says so. Chain-meal scores before today were graded against wrong numbers.
+
+### The data: `data/restaurants/*.jsonl` -> `public.restaurant_items`
+
+`scripts/restaurants/`, one fetcher per source, all through `common.py`,
+which refuses rows missing macros and flags rows whose 4/4/9 sum disagrees with
+stated calories (alcohol exempt). `load.py` replaces each chain's rows wholesale.
+Migration `add_restaurant_items`: two tables, read-only to `authenticated`,
+written by service_role only, same shape as `foods`.
+
+- **Official feeds:** Chick-fil-A (322 rows, every size, from the page's
+  embedded state), Sweetgreen (52, HTML tables), McDonald's (173, the
+  calculator's `dnaapp/itemDetails` endpoint) and Chipotle (53). The last two
+  only answer inside a browser, so they were captured with the Browser pane into
+  `data/restaurants/raw/`. **Chipotle's feed is messy** (the same protein at
+  five portions, calorie-only rows, cauliflower rice at both 60 and 140 for the
+  same 4 oz, wrong image names), so `chipotle.py` is a reviewed ID map. Nothing
+  outside it is imported.
+- **Everything else via Nutritionix** (`m.nutritionix.com/<slug>`), which *is*
+  Taco Bell's official calculator and mirrors the rest. **Checked before
+  trusting it:** Chipotle proteins/rice/beans/guac/chips, Big Mac, McChicken,
+  QPCs, McNuggets 4-40, CFA sandwich and nuggets all matched the official feeds
+  exactly (one 5-kcal drift). Menu pages show 5 per category. "View More" is
+  XHR-only JSON and 400s without `Referer` + `X-Requested-With`, which the
+  first pass missed (Taco Bell came back with 68 of 446 rows).
+- CAVA publishes only a PDF. Downloaded with Danny's OK and parsed by `cava.py`
+  (113 rows).
+
+### How parse-meal uses it (deployed as v20)
+
+1. **Find the chain in the sentence** from `restaurant_chains.aliases`
+   ("chickfila", "mickey d's", "bk"). Names that are also words need restaurant
+   context: "chipotle mayo", "took the subway", "three chilis", "candy canes",
+   "a glass of cava" and "played dominos" all correctly match nothing, while
+   "chipotle chicken bowl", "canes box combo", "panda orange chicken" and
+   "sonic cherry limeade" match. Tested on 28 sentences against the real alias
+   list.
+2. **Send that chain's menu** as a second system block: numbered lines with
+   calories. Menus over 250 lines (Starbucks is 2,223: every size × milk) are cut to
+   the ≤300 lines sharing a word with the sentence. Reads page past PostgREST's
+   1,000-row cap.
+3. **The model returns line numbers and counts** in a new `menu` field
+   ("chicken ×1, white rice ×1, black beans ×1, cheese ×1"; a Five Guys burger
+   is bun + patty ×2 + toppings), **and the code sums the official numbers.** No
+   model arithmetic, which is exactly what the Haiku A/B below showed can't be
+   trusted. Any invalid line voids the pick back to the estimate.
+4. Items come back `source: "restaurant"`, `matched_name` listing the lines,
+   and the model's own guess kept as `estimate_calories` so an eval can measure
+   how far the menu moved it. The app labels them "from the menu" and stores them
+   as `ai`, with no enum change. `evals/run.py --no-menus` A/Bs it.
+
+One bug caught by review before it could ship: `loadMenu` redeclared its `text`
+parameter, a hard error that the surrounding try/catch would have swallowed.
+Menus would have silently never loaded. A stubbed `tsc --strict` pass over the
+function now finds nothing new.
+
+### Next
+
+1. The bread-dedupe prompt (v27, entry below) on top, measured the same way.
+2. Nutritionix terms before launch (QUESTIONS.md).
+3. Menus are refreshed by rerunning the fetchers + `load.py`; nothing does that
+   on a schedule yet. Chains change menus a few times a year.
+
+---
+
 ## 2026-09-21 — the burger undercount and the bread dedupe: one fixed, one needs Sonnet
 
 **Outcome: nothing deployed. Production is still v19 (the v15 prompt).** The
