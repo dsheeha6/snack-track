@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -125,6 +134,20 @@ export function SignInScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+        {/* The iOS number pad has no Return key, so on the code step the button is
+            the only way to submit -- and the keyboard was sitting on top of it.
+            The view lifts the content above the keyboard and the scroll view
+            lets you reach the button if it still doesn't fit; taps on the button
+            must land on the first try rather than just dismissing the keyboard. */}
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
         <ThemedText type="title" style={styles.title}>
           SNACK TRACK
         </ThemedText>
@@ -145,6 +168,8 @@ export function SignInScreen() {
                 textContentType="oneTimeCode"
                 autoComplete="one-time-code"
                 autoFocus
+                returnKeyType="done"
+                onSubmitEditing={() => codeOk && handleVerify()}
                 style={[styles.input, styles.codeInput]}
               />
               <Feedback error={error} notice={notice} />
@@ -250,6 +275,8 @@ export function SignInScreen() {
             </>
           )}
         </ThemedView>
+        </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </ThemedView>
   );
@@ -289,8 +316,15 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  flex: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.four,
     gap: Spacing.four,
   },
   title: {

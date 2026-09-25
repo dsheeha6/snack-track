@@ -152,6 +152,16 @@ A physical iPhone waits on the Apple membership, deferred by choice.)*
       goal line ported from the prototype, tap a day to see its entries, plus
       a simple "days logged in a row" streak (no prototype precedent for
       streaks specifically, so this is a first design — see BUILD_LOG)
+- [x] **Log to a different day (2026-09-25, Danny's ask: forgot Thursday, it's
+      Friday).** `‹ Yesterday ›` stepper under the Today title and inside the
+      Add food sheet; the sheet's day is the day the food is saved to, and the
+      screen follows it there afterwards. Can't step past today. Water follows
+      the day being viewed. Typechecked and bundled; not yet tried on a phone.
+      Not built: a calendar jump for going back many days (tap the label to
+      return to today) — add it if one-day steps prove too slow.
+- [ ] Sign-in code step: the keyboard covered the button (the iOS number pad has
+      no Return key). Sign-in screen now scrolls and lifts above the keyboard
+      (2026-09-25) — **needs eyes on a real phone**; typechecked only.
 - [x] **Water write bug fixed 2026-09-13** (Danny: "the water doesnt work
       well"). The goal wouldn't save and the count reset — one cause, and not a
       water bug: every write in the app called `supabase.auth.getUser()` first,

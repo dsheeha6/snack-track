@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddEntryModal } from '@/components/add-entry-modal';
+import { DateStepper } from '@/components/date-stepper';
 import { EntryRow } from '@/components/entry-row';
 import { MacroBar } from '@/components/macro-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -12,7 +13,7 @@ import { Brand, Spacing } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
 import { biometricLabel } from '@/lib/biometrics';
 import { addEntries, addEntry, deleteEntry, fetchEntries, type Entry, type NewEntry } from '@/lib/entries';
-import { guessMealSlot, localDateString, MEAL_COLORS, MEAL_LABELS, MEAL_SLOTS, type MealSlot } from '@/lib/meals';
+import { dayLabel, guessMealSlot, localDateString, MEAL_COLORS, MEAL_LABELS, MEAL_SLOTS, type MealSlot } from '@/lib/meals';
 import { supabase } from '@/lib/supabase';
 import {
   addWater,
@@ -56,7 +57,12 @@ export function TodayScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [modalMeal, setModalMeal] = useState<MealSlot | null>(null);
 
-  const eatenOn = localDateString();
+  // null means "follow today", so leaving the app open past midnight still
+  // rolls over to the new day. Only a day the user stepped back to is pinned.
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
+  const today = localDateString();
+  const eatenOn = pickedDate ?? today;
+  const viewDate = (date: string) => setPickedDate(date === today ? null : date);
 
   const loadEntries = useCallback(() => {
     fetchEntries(eatenOn)
@@ -97,8 +103,21 @@ export function TodayScreen() {
 
   const handleSave = async (entry: NewEntry) => {
     const saved = await addEntry(entry);
-    setEntries((prev) => [...prev, saved]);
+    showSaved([saved]);
     setModalMeal(null);
+  };
+
+  // The sheet lets you pick a different day than the one on screen. Follow the
+  // food there, so what you just logged is what you're looking at; otherwise
+  // it would save to Thursday while Friday stays open and looks unchanged.
+  const showSaved = (saved: Entry[]) => {
+    const day = saved[0]?.eaten_on;
+    if (day && day !== eatenOn) {
+      setEntries([]);
+      viewDate(day);
+    } else {
+      setEntries((prev) => [...prev, ...saved]);
+    }
   };
 
   // One sentence usually becomes several rows. Not optimistic like water: these
@@ -107,7 +126,7 @@ export function TodayScreen() {
   // day's totals if it failed.
   const handleSaveMany = async (newEntries: NewEntry[]) => {
     const saved = await addEntries(newEntries);
-    setEntries((prev) => [...prev, ...saved]);
+    showSaved(saved);
     setModalMeal(null);
   };
 
@@ -175,8 +194,9 @@ export function TodayScreen() {
             Signed in as {session?.user.email}
           </ThemedText>
           <ThemedText type="title" style={styles.title}>
-            Today
+            {dayLabel(eatenOn, today)}
           </ThemedText>
+          <DateStepper date={eatenOn} onChange={viewDate} max={today} />
 
           {loadError && <ThemedText style={styles.error}>{loadError}</ThemedText>}
 

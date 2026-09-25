@@ -5,6 +5,33 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-25 — log to a past day, sign-in keyboard fix, audit
+
+Danny's asks: Face ID, Google/Apple sign-in, the keyboard covering the code
+step's button, and logging to a different day.
+
+- **Face ID: already built**, not new work. It's an opt-in lock over an existing
+  session (`lib/biometrics.ts`): sign in once, then tap "Lock with Face ID" at
+  the bottom of Today. It has never been seen running (web has no biometrics).
+  Expo Go on iPhone may not support Face ID at all; if it prompts for passcode
+  instead, that is why, and it needs a dev build.
+- **Google / Apple sign-in: not built**, per Danny's 2026-08-24 build order
+  (QUESTIONS.md → "Build order"). Apple also needs the $99 membership.
+- **Keyboard fix:** `sign-in-screen.tsx` is now a `KeyboardAvoidingView` around
+  a `ScrollView` with `keyboardShouldPersistTaps="handled"`; the code field
+  submits on Return where the keyboard has one. Typechecked, not run on a phone.
+- **Past-day logging:** new `components/date-stepper.tsx` and `dayLabel()` in
+  `lib/meals.ts`. `today-screen.tsx` holds `pickedDate` (null = follow today, so
+  midnight still rolls over); the Add food sheet has its own stepper and saves
+  to that day, and the screen jumps to it after saving. `tsc` clean and
+  `expo export --platform web` bundles; ESLint isn't installed in `mobile/`.
+- **npm:** `expo install --fix` moved 12 packages to their SDK 57 versions;
+  `npm audit fix` cleared the one high (`@xmldom/xmldom`). 14 moderates remain
+  (`decode-uri-component`, `uuid`); the only fix is `--force`, which would
+  downgrade `expo-router` to 5.x. Left alone; they arrive with Expo updates.
+
+---
+
 ## 2026-09-22 (evening) — Sonnet is live; database-first parse built, measured, left off
 
 **Production is parse-meal v22 on `claude-sonnet-5`** (Danny's go-ahead). The

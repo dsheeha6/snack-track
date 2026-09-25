@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DateStepper } from '@/components/date-stepper';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand, Spacing } from '@/constants/theme';
@@ -69,6 +70,10 @@ function AddEntryForm({
   onSaveMany,
 }: Omit<AddEntryModalProps, 'visible'>) {
   const [meal, setMeal] = useState<MealSlot>(defaultMeal);
+  // Starts on the day the screen behind is showing, and is the day the food
+  // gets logged to. The form remounts on every open, so this never carries
+  // over from a previous sheet.
+  const [date, setDate] = useState(eatenOn);
   const [sentence, setSentence] = useState('');
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState<ReviewItem[] | null>(null);
@@ -174,7 +179,7 @@ function AddEntryForm({
     try {
       await onSaveMany(
         items.map((item) => ({
-          eaten_on: eatenOn,
+          eaten_on: date,
           meal,
           name: item.name,
           qty: item.qty || null,
@@ -231,7 +236,7 @@ function AddEntryForm({
     setError(null);
     try {
       await onSave({
-        eaten_on: eatenOn,
+        eaten_on: date,
         meal,
         name: form.name.trim(),
         qty: form.qty.trim() || null,
@@ -268,6 +273,8 @@ function AddEntryForm({
                 <ThemedText type="linkPrimary">Close</ThemedText>
               </Pressable>
             </View>
+
+            <DateStepper date={date} onChange={setDate} />
 
             <View style={styles.mealPicker}>
               {MEAL_SLOTS.map((slot) => (

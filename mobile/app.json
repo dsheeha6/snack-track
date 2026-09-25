@@ -38,7 +38,9 @@
         {
           "faceIDPermission": "Allow SNACK TRACK to unlock with Face ID so you can get to your day fast."
         }
-      ]
+      ],
+      "expo-image",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

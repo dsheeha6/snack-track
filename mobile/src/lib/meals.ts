@@ -39,6 +39,19 @@ export function localDateString(date: Date = new Date()): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// "Today" / "Yesterday" / "Thu, Sep 24" for a YYYY-MM-DD date. Built from
+// calendar parts so it never passes through a timezone.
+export function dayLabel(dateStr: string, today: string = localDateString()): string {
+  if (dateStr === today) return 'Today';
+  if (dateStr === shiftDate(today, -1)) return 'Yesterday';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 // Same day-math approach as the prototype's shift(): parse as calendar parts
 // (not a Date-object add) so it's immune to DST and month-length edge cases.
 export function shiftDate(dateStr: string, days: number): string {
