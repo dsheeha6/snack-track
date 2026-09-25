@@ -129,10 +129,6 @@ Rules that matter:
   than a home cook does, and plate more of it: a restaurant portion is commonly
   1.5 to 2 times the home or USDA serving of the same name. Price the dish as a
   kitchen makes it, not as a nutrition label averages it.
-- Restaurant sizing is only for restaurant food. When the sentence gives no sign
-  the food came from a restaurant, takeout, delivery, a venue or a chain, it was
-  made or served at home: portion it as a standard home or package serving, and
-  read size words as modestly above that, not as a restaurant plate.
 - A named dish is that dish, not its category. "Carbonara" is egg, hard cheese
   and guanciale, not "pasta". "Poutine" is fries under curds and gravy, not
   fries. If a dish has a name, price what that name actually contains.

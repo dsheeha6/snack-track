@@ -1,6 +1,8 @@
 """Local A/B: score a prompt file on a meal set N times with run.py's own score().
 
 usage: python ab.py <prompt.ts> <meals.jsonl> <n> <out.json>
+
+env: PROBE_MODEL (default claude-haiku-4-5), PROBE_TEMP (unset = API default 1.0)
 """
 import json, os, re, sys, statistics, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -24,9 +26,12 @@ meals = run.load_meals(os.path.join(EVALS, meals_path))
 
 
 def one(meal):
-    body = json.dumps({"model": os.environ.get("PROBE_MODEL", "claude-haiku-4-5"), "max_tokens": 2000, "system": system,
+    req_body = {"model": os.environ.get("PROBE_MODEL", "claude-haiku-4-5"), "max_tokens": 2000, "system": system,
                        "tools": [tool], "tool_choice": {"type": "tool", "name": "log_meal"},
-                       "messages": [{"role": "user", "content": meal["text"]}]}).encode()
+                       "messages": [{"role": "user", "content": meal["text"]}]}
+    if os.environ.get("PROBE_TEMP"):
+        req_body["temperature"] = float(os.environ["PROBE_TEMP"])
+    body = json.dumps(req_body).encode()
     for attempt in range(6):
         try:
             req = urllib.request.Request(base + "/v1/messages", data=body, headers={

@@ -8,6 +8,16 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
+### Three easy-set answers look wrong (2026-09-25)
+The everyday 50 is frozen, so this is your call (same as m28 egg whites):
+- m47 "a scoop of black beans" keyed as 0.5 cup = 227 kcal. 227 is a full cup; half is 114.
+- m14 "half an avocado" keyed at 240. Half a medium avocado is ~160.
+- m49 "a hot dog at the game" keyed at 150, which is the frank with no bun (~270 with).
+Fixing all three moves the score about a point (12.5% -> 11.4% on v22), so it
+matters for judging future prompt changes. Yes/no?
+
+**Danny:**
+
 ### Two calls on the restaurant data (2026-09-21)
 1. ~~CAVA PDF~~ answered 2026-09-21: yes, downloaded and parsed.
 2. **Most chains come via Nutritionix's public pages.** The numbers match the

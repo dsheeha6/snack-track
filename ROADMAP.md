@@ -383,6 +383,28 @@ target. Details under **Accuracy work** below.
       Danny's request. Not a win live (easy 15.0% -> 15.7%, hard 4.3% ->
       4.6%, +25% cost), so the app stays on `estimate`. Kept as the lookup
       path Phase 5b's community foods will plug into.
+- [x] **Home food no longer gets restaurant portions** — 2026-09-25, live as
+      **parse-meal v23**. The v19 restaurant-sizing rule was leaking into meals
+      with no restaurant in them (pancakes 402 vs 232, chicken and rice 650 vs
+      487). One rule: restaurant sizing only when the sentence says restaurant,
+      takeout, a venue or a chain. 10 runs a side locally: easy 50 **13.50% ->
+      11.65%** (t=4.6), hard 20 4.58% -> 4.65% (flat). Live, 3 runs: **12.5% ->
+      11.0%**, all 7 chain meals exact in 21 of 21 parses. Sonnet 5 rejects
+      `temperature`, so run-to-run wobble can only be cut through the prompt.
+- [ ] **Three easy-set answers look wrong — Danny's call** (the set is frozen;
+      m28 set the precedent). m47 "0.5 cup" black beans keyed at 227 (that's a
+      cup; half is 114), m14 half an avocado at 240 (~160), m49 a hot dog at 150
+      (no bun; ~270 with). Fixing all three moves the v22 baseline 12.5% -> 11.4%.
+      Also in QUESTIONS.md.
+- [ ] **Packaged products should use the label, not an estimate.** Danny's real
+      log 2026-09-24: "a chocolate RX bar and a 42 pro muscle milk" came back
+      310 kcal where the labels add to 250. Not far off, but a named packaged
+      product has one right answer and we already hold ~399k branded rows
+      (`source='usda_branded'`). Likely lever: when an item names a brand +
+      product, look it up the way chain menus work (model picks a row, code
+      uses the label numbers) instead of letting the model guess. Check first
+      whether both products are in `foods` at all. Add a small branded-product
+      eval set (bars, shakes, yogurts) so it's measured, not eyeballed.
 - [ ] **Remaining error is portion, not food identity.** The worst easy-set
       meals (tortillas + beans, waffles, pancakes, "a big bowl of pasta")
       have the right food and the wrong amount. This is the next accuracy
@@ -627,6 +649,11 @@ he's already logged.
 - [ ] Hide-calorie-numbers setting, disclaimer, App Review health compliance
 - [ ] Icon, screenshots, listing copy
 - [ ] TestFlight with a handful of real people
+- [ ] **Google and Apple sign-in** (Danny asked again 2026-09-25). Deferred by his
+      2026-08-24 build order: these move together with the Supabase redirect
+      allowlist, late. Apple needs the $99 developer membership, and App Review
+      requires Sign in with Apple if Google sign-in is offered. Scope is in
+      QUESTIONS.md -> "Build order".
 - [ ] Submit
 - [ ] Launch content ready to go — see `marketing/MARKETING.md`. The first 90-day
       challenge can't ask anyone to install until this phase is done.

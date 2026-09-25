@@ -360,9 +360,10 @@ def main():
         return PIPELINES[args.pipeline](meals)
 
     if args.repeat > 1:
-        summaries, results = [], None
+        summaries, results, all_results = [], None, []
         for i in range(args.repeat):
             results = one_pass()
+            all_results.append(results)
             summaries.append(score(results, tolerance_pct=args.tolerance))
             print(f"run {i+1}/{args.repeat}: {summaries[-1]['calories_mape']}% mean calorie error")
         print_repeat_report(summaries, len(meals))
@@ -391,7 +392,10 @@ def main():
 
     if args.json:
         with open(args.json, "w", encoding="utf-8") as f:
-            json.dump({"pipeline": args.pipeline, "summary": summary, "results": results}, f, indent=2)
+            out = {"pipeline": args.pipeline, "summary": summary, "results": results}
+            if args.repeat > 1:
+                out["runs"] = [{"summary": s, "results": r} for s, r in zip(summaries, all_results)]
+            json.dump(out, f, indent=2)
         print(f"Full results written to {args.json}")
 
 

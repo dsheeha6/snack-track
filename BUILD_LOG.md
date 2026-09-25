@@ -5,6 +5,49 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-25 (later) — parse-meal v23: home food stops getting restaurant portions
+
+Live v22 baseline, easy 50 x5: **12.5%** (sd 0.6). Reading the misses per meal:
+
+- **The v19 restaurant rule leaks into home food.** "2 pancakes with a
+  tablespoon of maple syrup" came back 402 in 2 of 5 runs (truth 232); "a
+  plate of chicken and rice" 650 (487); "a big bowl of pasta with chicken" 850
+  (582). Nothing in those sentences says restaurant.
+- **No temperature to turn down.** The function never set one, and Sonnet 5
+  rejects it outright (`temperature is deprecated for this model`), so the
+  run-to-run wobble can only come down through the prompt.
+- **Three answer-key errors** (m47 beans, m14 avocado, m49 hot dog; QUESTIONS.md).
+
+**The fix, one rule:** restaurant sizing only when the sentence gives a sign
+of a restaurant, takeout, delivery, a venue or a chain; otherwise a standard
+home or package serving, with size words read as modestly above that. The
+first draft quoted size phrases lifted from eval sentences; removed before
+running, per the no-contamination rule.
+
+| 10 runs a side, local, no menus | v22 | v23 |
+|---|---|---|
+| easy 50 | 13.50% (sd 1.03) | **11.65%** (sd 0.76) |
+| hard 20 | 4.58% (sd 0.51) | 4.65% (sd 0.53) |
+
+Difference on the easy set -1.85 points, se 0.40, t=-4.6. Gains are exactly
+the home meals (pancakes 323 -> 231, greek yogurt 300 -> 248, pasta, chicken
+sandwich, chicken and rice); small losses are on meals whose truth is
+questionable (hot dog at the game now gets venue sizing, which is correct).
+
+**Deployed as parse-meal v23** (Danny's go-ahead). Live, 3 runs: **11.0 /
+10.7 / 11.3%**, all 7 chain meals exact in 21 of 21 parses. Cost unchanged.
+
+Harness changes: `run.py --repeat N --json` now keeps every run (`runs`), not
+only the last; `variants/ab_local.py` takes `PROBE_TEMP` (moot for Sonnet 5,
+kept for other models). Variants in `evals/variants/v22_live.ts`,
+`v23_home_portions.ts`.
+
+Logged for later (ROADMAP → Tier 1): Danny's RX bar + Muscle Milk 42 read 310
+against 250 on the labels. Packaged products should come from the branded
+rows, not an estimate. Google/Apple sign-in added to Phase 8 as a line item.
+
+---
+
 ## 2026-09-25 — log to a past day, sign-in keyboard fix, audit
 
 Danny's asks: Face ID, Google/Apple sign-in, the keyboard covering the code
