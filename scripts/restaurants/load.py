@@ -48,11 +48,33 @@ EXTRA_ALIASES = {
 }
 
 
+# Trademarked items that name the chain on their own: "a big mac" with no
+# "mcdonalds" in the sentence (2026-09-25). Only names nobody uses for anything
+# else: not "frosty", "blizzard" (ordinary words) or "double double" (also a
+# Tim Hortons coffee). Plurals listed because aliases match whole words.
+ITEM_ALIASES = {
+    "mcdonalds": ["big mac", "big macs", "mcchicken", "mcchickens", "mcflurry", "mcflurries",
+                  "mcmuffin", "mcmuffins", "quarter pounder", "quarter pounders", "mcnugget",
+                  "mcnuggets", "mcgriddle", "mcgriddles", "mcdouble", "mcdoubles",
+                  "filet-o-fish", "filet o fish"],
+    "burger-king": ["whopper", "whoppers"],
+    "wendys": ["baconator", "baconators"],
+    "taco-bell": ["crunchwrap", "crunchwraps", "chalupa", "chalupas", "doritos locos"],
+    "shake-shack": ["shackburger", "shackburgers"],
+    "tim-hortons": ["timbits"],
+    "starbucks": ["frappuccino", "frappuccinos"],
+    "raising-canes": ["caniac"],
+    "jack-in-the-box": ["jumbo jack"],
+    "chipotle": ["sofritas"],
+}
+
+
 def aliases(slug, name):
     base = name.lower()
     out = {base, re.sub(r"[^a-z0-9 ]", "", base), re.sub(r"[^a-z0-9]", "", base),
            slug.replace("-", " "), slug.replace("-", "")}
     out.update(EXTRA_ALIASES.get(slug, []))
+    out.update(ITEM_ALIASES.get(slug, []))
     return sorted(a.strip() for a in out if len(a.strip()) >= 2)
 
 

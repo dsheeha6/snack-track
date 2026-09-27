@@ -391,20 +391,35 @@ target. Details under **Accuracy work** below.
       11.65%** (t=4.6), hard 20 4.58% -> 4.65% (flat). Live, 3 runs: **12.5% ->
       11.0%**, all 7 chain meals exact in 21 of 21 parses. Sonnet 5 rejects
       `temperature`, so run-to-run wobble can only be cut through the prompt.
-- [ ] **Three easy-set answers look wrong — Danny's call** (the set is frozen;
-      m28 set the precedent). m47 "0.5 cup" black beans keyed at 227 (that's a
-      cup; half is 114), m14 half an avocado at 240 (~160), m49 a hot dog at 150
-      (no bun; ~270 with). Fixing all three moves the v22 baseline 12.5% -> 11.4%.
-      Also in QUESTIONS.md.
-- [ ] **Packaged products should use the label, not an estimate.** Danny's real
-      log 2026-09-24: "a chocolate RX bar and a 42 pro muscle milk" came back
-      310 kcal where the labels add to 250. Not far off, but a named packaged
-      product has one right answer and we already hold ~399k branded rows
-      (`source='usda_branded'`). Likely lever: when an item names a brand +
-      product, look it up the way chain menus work (model picks a row, code
-      uses the label numbers) instead of letting the model guess. Check first
-      whether both products are in `foods` at all. Add a small branded-product
-      eval set (bars, shakes, yogurts) so it's measured, not eyeballed.
+- [x] **Three easy-set answers corrected** (Danny's OK, 2026-09-25): m47 beans
+      227 -> 114, m14 half avocado 240 -> 160, m49 hot dog 150 -> 270 with bun.
+      Rescored on the corrected set: live v22 **11.4%**, live v23 **9.9%**.
+- [x] **Chains named only by an item** — 2026-09-25. "a big mac", "2
+      mcchickens", "caniac combo" now load the chain's menu. `ITEM_ALIASES` in
+      `scripts/restaurants/load.py` (only trademarks nobody uses for anything
+      else), applied to `restaurant_chains`. New `evals/meals_items.jsonl` (11
+      meals, chain published numbers): **7.1% -> 0.0%, 33 of 33 exact**.
+- [ ] **Packaged products: measured, and mostly already right.** New
+      `evals/meals_branded.jsonl` (16 meals, label numbers): live v23 **5.5%**,
+      9 of 16 exact. The RX bar in Danny's 2026-09-24 log was exact (210); the
+      miss was Muscle Milk Pro Series 42 (310 vs 250), which **isn't in the
+      USDA branded data at all**, so a lookup wouldn't have caught it. The
+      misses that remain are less common products (Larabar -17%, ONE bar -15%,
+      KIND/siggi's/Chobani +11-12%). A branded lookup would need per-package
+      size, and `foods` only has per-100 g. **The sizes are already staged**
+      (`scripts/.cache/branded.sqlite`, `serving_size` + `household`), so the
+      plan is: add `package_grams` / `package_label` columns in the Tier 2
+      sugar+fiber migration and load them in the same re-seed, then a
+      menu-style branded lookup. Don't do the re-seed twice.
+- [ ] **Contamination check exists; one decision pending.**
+      `scripts/check_contamination.py` (exit 1 on any hit) found the prompt
+      teaching "a bowl of oatmeal is about a cup cooked" (eval m21's exact
+      answer) and a Chipotle burrito bowl example overlapping m16/m38. The
+      reworded prompt is `evals/variants/v24_no_leaks.ts` (grits, a Panera
+      soup): 10 runs, easy 11.31% vs v23 10.52% (+0.8, se 0.41, not
+      significant; scattered, m21 itself unhurt), hard 5.06% vs 4.65% (5
+      runs). **Not deployed — Danny's call** (QUESTIONS.md). Until then the
+      check reports those 3 hits against the live prompt.
 - [ ] **Remaining error is portion, not food identity.** The worst easy-set
       meals (tortillas + beans, waffles, pancakes, "a big bowl of pasta")
       have the right food and the wrong amount. This is the next accuracy
@@ -416,10 +431,10 @@ target. Details under **Accuracy work** below.
       2026-09-22 (worse on both sets, and it merged h15's second helping of
       chips; BUILD_LOG). If retried, do it in code, not prompt wording. Currently masked by the
       bias. Expect h01 to move oddly before it moves right.
-- [ ] **Never put eval-set dishes in the prompt.** The first v14 draft named
+- [x] **Never put eval-set dishes in the prompt.** The first v14 draft named
       pommes aligot, adjaruli khachapuri and the baguette/bread-service pair —
-      caught before deploying, but it would have made the re-run meaningless.
-      Worth a contamination check in `scripts/`.
+      caught before deploying. `scripts/check_contamination.py` now checks it
+      (2026-09-25); run it before deploying any prompt change.
 
 ### Tier 2 — the schema change that gets costlier the longer it waits
 

@@ -8,13 +8,15 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
-### Three easy-set answers look wrong (2026-09-25)
-The everyday 50 is frozen, so this is your call (same as m28 egg whites):
-- m47 "a scoop of black beans" keyed as 0.5 cup = 227 kcal. 227 is a full cup; half is 114.
-- m14 "half an avocado" keyed at 240. Half a medium avocado is ~160.
-- m49 "a hot dog at the game" keyed at 150, which is the frank with no bun (~270 with).
-Fixing all three moves the score about a point (12.5% -> 11.4% on v22), so it
-matters for judging future prompt changes. Yes/no?
+### Deploy the leak-free prompt (v24)? (2026-09-25)
+The live prompt teaches "a bowl of oatmeal is about a cup cooked", which is
+eval meal m21's exact answer, and uses a Chipotle burrito bowl example that
+overlaps two eval meals. That makes our scores look a little better than they
+are. v24 swaps in examples no eval uses (grits, a Panera soup). Measured: easy
+set 11.3% vs 10.5% at 10 runs, a difference that is within noise, and the
+oatmeal meal itself didn't move. For you, logging food, it's a wash; for
+trusting the numbers, v24 is cleaner. Recommend: deploy it and treat its score
+as the honest baseline. Yes/no?
 
 **Danny:**
 
@@ -91,6 +93,11 @@ so the hook this needs will already exist by the time this phase starts.
 ---
 
 ## ANSWERED
+
+### Three easy-set answers — fixed 2026-09-25
+Danny: "yes fix those three answers". m47 beans 227 -> 114, m14 half avocado
+240 -> 160, m49 hot dog 150 -> 270 (bun added). Notes on each line in
+meals.jsonl.
 
 ### m28 egg whites: fixed 2026-09-22
 Danny: fix it. It uses the literal reading, twelve whites = 204 kcal. See BUILD_LOG.

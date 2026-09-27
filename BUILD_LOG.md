@@ -5,6 +5,40 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-25 (evening) — answer key fixed, chain item names, packaged products measured, leak check
+
+- **Answer key.** m47, m14, m49 corrected (Danny's OK; QUESTIONS.md). Rescored:
+  live v22 11.4%, **live v23 9.9%** — first time under 10%.
+- **Chain item names.** "a big mac" with no "mcdonalds" never loaded the menu.
+  `ITEM_ALIASES` in `scripts/restaurants/load.py` (Big Mac, McChicken,
+  McFlurry, Whopper, Baconator, Crunchwrap, Chalupa, ShackBurger, Caniac,
+  Frappuccino, Timbits...; not Frosty/Blizzard/Double-Double, which are
+  ordinary words or another chain's order), applied to `restaurant_chains`
+  with SQL generated from `load.aliases()` so the file and the table agree.
+  `evals/meals_items.jsonl`, 11 meals, live x3: **7.1% -> 0.0%** (Caniac
+  combo 1,230 -> 1,840 exact). The function caches chains 10 min, so the
+  after-run waited that out.
+- **Packaged products.** `evals/meals_branded.jsonl`, 16 meals with label
+  truth from USDA Branded (serving size x per-100 g): live v23 **5.5%**, 9 of
+  16 exact. Danny's 2026-09-24 entries: RX Bar Chocolate 210 (label 210,
+  exact); Muscle Milk Pro Series 42 Chocolate 310 (label 250) — not in the
+  branded data at all. Found that `foods` holds branded rows **per 100 g
+  only** (399,293 of 399,293), so any lookup needs package size; it's staged
+  in `scripts/.cache/branded.sqlite` and should ride the Tier 2 re-seed.
+  Also noticed junk rows (a Muscle Milk bar with 0.1 g carbs per 100 g).
+- **Contamination check.** `scripts/check_contamination.py`: every 3-word run
+  of every eval sentence and hard-set item name vs the prompt constants. Found
+  one real leak (m21 oatmeal = "about a cup cooked", verbatim in SYSTEM) and a
+  Chipotle bowl overlap. v24 (`evals/variants/v24_no_leaks.ts`) rewords them:
+  easy 11.31% (sd 1.08, n=10) vs v23 10.52% (sd 0.73) on corrected truths,
+  +0.79, se 0.41; hard 5.06% (n=5) vs 4.65%. Scattered per-meal changes,
+  m21 unaffected. **Held for Danny** (v23 was the approved deploy); repo stays
+  equal to what's live.
+- **Tried and dropped:** `temperature: 0` for consistency — Sonnet 5 rejects
+  the parameter (`deprecated for this model`).
+
+---
+
 ## 2026-09-25 (later) — parse-meal v23: home food stops getting restaurant portions
 
 Live v22 baseline, easy 50 x5: **12.5%** (sd 0.6). Reading the misses per meal:
