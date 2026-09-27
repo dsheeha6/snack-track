@@ -17,6 +17,8 @@ export type PersonalFood = {
   protein: number;
   carbs: number;
   fat: number;
+  sugar: number | null;
+  fiber: number | null;
 };
 
 /**
@@ -42,7 +44,7 @@ export async function fetchPersonalFoods(phrases: string[]): Promise<Map<string,
 
   const { data, error } = await supabase
     .from('personal_foods')
-    .select('phrase, name, qty, calories, protein, carbs, fat')
+    .select('phrase, name, qty, calories, protein, carbs, fat, sugar, fiber')
     .in('phrase', keys);
 
   // A correction we fail to load is a worse meal, not a broken one: fall back

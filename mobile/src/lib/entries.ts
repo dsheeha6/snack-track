@@ -11,6 +11,9 @@ export type Entry = {
   protein: number;
   carbs: number;
   fat: number;
+  /** Grams; null = unknown (manual entries, rows logged before 2026-09-25). */
+  sugar: number | null;
+  fiber: number | null;
   source: 'manual' | 'ai' | 'database' | 'history' | 'suggestion';
   /** Catalogue row this was matched to, when resolution was confident. Never affects the macros above. */
   food_id: string | null;
@@ -18,7 +21,7 @@ export type Entry = {
 };
 
 const ENTRY_COLUMNS =
-  'id, eaten_on, meal, name, qty, calories, protein, carbs, fat, source, food_id, created_at';
+  'id, eaten_on, meal, name, qty, calories, protein, carbs, fat, sugar, fiber, source, food_id, created_at';
 
 export async function fetchEntries(eatenOn: string): Promise<Entry[]> {
   const { data, error } = await supabase
@@ -51,6 +54,8 @@ export type NewEntry = {
   protein: number;
   carbs: number;
   fat: number;
+  sugar?: number | null;
+  fiber?: number | null;
   source: Entry['source'];
   food_id?: string | null;
 };

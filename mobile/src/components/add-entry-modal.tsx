@@ -158,6 +158,10 @@ function AddEntryForm({
               protein: toNumber(draft.protein),
               carbs: toNumber(draft.carbs),
               fat: toNumber(draft.fat),
+              // The edit form has no sugar/fiber fields, so the parser's figures
+              // would describe a food they just told us was wrong: unknown.
+              sugar: null,
+              fiber: null,
               // Their numbers now. Not an estimate, so it stops being described
               // as one — see confidenceNote.
               source: 'personal' as const,
@@ -187,6 +191,8 @@ function AddEntryForm({
           protein: item.protein,
           carbs: item.carbs,
           fat: item.fat,
+          sugar: item.sugar,
+          fiber: item.fiber,
           // Where the numbers on this row actually came from, which after a
           // correction is no longer the parser: a row the user just typed over
           // is `manual`, and one that arrived already carrying their stored

@@ -10,6 +10,13 @@ export type ParsedItem = {
   carbs: number;
   fat: number;
   /**
+   * Grams, from parse-meal v25 on (2026-09-25). `null` means unknown — a
+   * corrected row whose correction predates sugar/fiber, or a hand edit — and
+   * is saved as NULL, never 0.
+   */
+  sugar: number | null;
+  fiber: number | null;
+  /**
    * `personal` — these are the user's own corrected numbers, not an estimate.
    * `restaurant` — summed from the chain's published nutrition (parse-meal's
    * restaurant menus, 2026-09-21); matched_name says which menu lines.
@@ -103,6 +110,11 @@ async function applyCorrections(meal: ParsedMeal): Promise<ParsedMeal> {
       protein: round1(Number(mine.protein) * servings),
       carbs: round1(Number(mine.carbs) * servings),
       fat: round1(Number(mine.fat) * servings),
+      // Their stored sugar/fiber if the correction has them. A correction saved
+      // before v25 has none, and the parser's figure belongs to whatever food
+      // the parser thought this was, not to the food they corrected it to.
+      sugar: mine.sugar == null ? null : round1(Number(mine.sugar) * servings),
+      fiber: mine.fiber == null ? null : round1(Number(mine.fiber) * servings),
       source: 'personal' as const,
       // It's their own number. Nothing about it is an estimate any more, so the
       // "estimated portion" note would be both wrong and faintly insulting.

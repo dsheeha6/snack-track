@@ -449,15 +449,36 @@ target. Details under **Accuracy work** below.
       branded sugar 96%, fiber 87%, package 99%; SR Legacy sugar 77%, fiber 93%.
       NULL = unknown, never 0. Spot checks: RXBAR 52 g = 210 kcal / 13 g sugar /
       5 g fiber (label); banana 12.2 / 2.6 per 100 g. 27 entries still linked.
-- [ ] **Sugar/fiber reach the user.** The columns exist and `foods` is full,
-      but nothing writes `entries.sugar/fiber` yet: parse-meal returns four
-      macros, the Add food sheet saves four. Next: add sugar/fiber to the
-      log_meal tool and the save path, then the goal-based display (QUESTIONS.md
-      -> "Goal-based nutrient tracking"). Measure the tool change on the evals
-      first; a bigger schema can move calorie accuracy.
+- [x] **Sugar/fiber reach the entry — parse-meal v25, 2026-09-25.** `sugar`
+      and `fiber` on the log_meal tool; chain menu picks use the chain's
+      published sugar/fiber when every picked line has them. App saves them on
+      parsed rows; a hand-edited row saves NULL (the parser's figure would
+      describe the food they just corrected away), manual/search rows NULL.
+      A/B at 10 runs: calories 11.61% -> 10.82% easy, hard flat, protein/
+      carbs/fat all equal or better. Live on packaged foods
+      (`meals_branded.jsonl`, now with label sugar/fiber; `evals/score_extras.py`):
+      **sugar 1.9 g mean abs error, fiber 0.7 g.** Worst: ONE birthday cake bar,
+      label 1 g sugar, model 9-17 g. Not yet displayed anywhere: which
+      nutrients show is the goal-based question in QUESTIONS.md.
 - [ ] **Branded lookup (now unblocked).** `foods.package_size` exists, so a
       packaged product can be priced as label x packages, menu-style.
       Baseline to beat: `meals_branded.jsonl` 5.5%.
+- [ ] **Load the everyday meals people actually eat: USDA FNDDS** (Danny's
+      idea, 2026-09-25: "have the most popular foods/meals/combinations in the
+      DB"). Checked: we have ingredients (SR Legacy) and packaged products
+      (Branded), but almost no home meals as eaten. "peanut butter and jelly",
+      "grilled cheese", "chicken caesar" return nothing; lasagna and burritos
+      exist only as frozen entrees. **FNDDS** (Food and Nutrient Database for
+      Dietary Studies, the survey behind NHANES) is exactly that gap: ~5,000
+      foods as eaten ("Peanut butter and jelly sandwich", "Spaghetti with
+      meatballs") with standard portions ("1 sandwich", "1 cup") and sugar/
+      fiber included. Public domain, same FDC download format as what's
+      already loaded. Size check first (free tier, 309 MB used). Then measure
+      whether offering FNDDS rows the way chain menus work beats the estimate
+      on home meals; the 09-22 database-first test says plain foods won't
+      move, so aim it at named home dishes and combos. Longer term, the most
+      popular meals are the ones people log: Phase 5b (community foods) and
+      `personal_foods` are where "popular" comes from once there are users.
 - [ ] **Space.** The in-place update left `foods` at 291 MB (was 154) until
       autovacuum reuses the dead rows; database 309 MB of 500. `VACUUM FULL
       foods` would reclaim it but needs ~160 MB free while it runs, so only

@@ -5,6 +5,33 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-25 (late) — parse-meal v25: sugar and fiber reach the entry
+
+- **Function:** `sugar`, `fiber` added to the strict log_meal tool (required)
+  and to the response items and totals. Chain menu picks sum the chain's
+  published sugar/fiber from `restaurant_items`, but only when every picked
+  line publishes it (a NULL line would otherwise count as 0); otherwise the
+  model's estimate stands for those two. USDA row paths (`foods`, `db`
+  modes) keep the model's sugar/fiber, since those RPCs return four macros.
+- **App:** `ParsedItem`, `Entry`, `NewEntry`, `PersonalFood` carry sugar/fiber
+  (nullable). Parsed rows save them; hand-edited rows save NULL; a stored
+  correction supplies its own sugar/fiber or NULL, never the parser's.
+  `tsc --noEmit` clean. Nothing displays them yet.
+- **A/B, v24 vs v25, local, 10 runs easy / 5 hard:** calories 11.61% ->
+  10.82% (se 0.34), hard 4.70% -> 4.62%; protein 10.48 -> 10.00, carbs
+  13.34 -> 12.66, fat 52.05 -> 50.24. No regression anywhere. Deployed.
+- **Live:** packaged foods x3 calories 2.8/5.7/3.1%; **sugar 1.9 g, fiber
+  0.7 g mean abs error** (new `evals/score_extras.py`; label sugar/fiber
+  added to `meals_branded.jsonl` from the rows loaded earlier tonight).
+  Easy set 9.0 / 10.7%. Big Mac comes back 7 g sugar / 3 g fiber from the
+  menu (McDonald's published figures).
+- **Danny's question — popular meals in the DB:** checked, and it's a real
+  gap: no PB&J, grilled cheese or chicken caesar; lasagna/burritos only as
+  frozen entrees. USDA FNDDS covers it (~5,000 foods as eaten, standard
+  portions). Added to ROADMAP, not started.
+
+---
+
 ## 2026-09-25 (night) — v24 live; sugar, fiber and package size in the database
 
 **parse-meal v24 deployed** (Danny's yes). Live x3 on the corrected easy set:
