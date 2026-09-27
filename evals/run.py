@@ -340,7 +340,7 @@ def main():
     ap.add_argument("--json", default=None, help="write full per-meal results to this path")
     ap.add_argument("--model", default=DEFAULT_MODEL,
                     help=f"claude pipeline only (default {DEFAULT_MODEL})")
-    ap.add_argument("--resolve", choices=["none", "estimate", "db", "foods"], default="none",
+    ap.add_argument("--resolve", choices=["none", "estimate", "db", "foods", "fndds"], default="none",
                     help="claude pipeline only: whether a `foods` match overrides "
                          "Claude's numbers (default none - score the parse alone)")
     ap.add_argument("--no-menus", action="store_true",

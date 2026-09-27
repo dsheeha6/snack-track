@@ -463,22 +463,26 @@ target. Details under **Accuracy work** below.
 - [ ] **Branded lookup (now unblocked).** `foods.package_size` exists, so a
       packaged product can be priced as label x packages, menu-style.
       Baseline to beat: `meals_branded.jsonl` 5.5%.
-- [ ] **Load the everyday meals people actually eat: USDA FNDDS** (Danny's
-      idea, 2026-09-25: "have the most popular foods/meals/combinations in the
-      DB"). Checked: we have ingredients (SR Legacy) and packaged products
-      (Branded), but almost no home meals as eaten. "peanut butter and jelly",
-      "grilled cheese", "chicken caesar" return nothing; lasagna and burritos
-      exist only as frozen entrees. **FNDDS** (Food and Nutrient Database for
-      Dietary Studies, the survey behind NHANES) is exactly that gap: ~5,000
-      foods as eaten ("Peanut butter and jelly sandwich", "Spaghetti with
-      meatballs") with standard portions ("1 sandwich", "1 cup") and sugar/
-      fiber included. Public domain, same FDC download format as what's
-      already loaded. Size check first (free tier, 309 MB used). Then measure
-      whether offering FNDDS rows the way chain menus work beats the estimate
-      on home meals; the 09-22 database-first test says plain foods won't
-      move, so aim it at named home dishes and combos. Longer term, the most
-      popular meals are the ones people log: Phase 5b (community foods) and
-      `personal_foods` are where "popular" comes from once there are users.
+- [x] **USDA FNDDS loaded — 2026-09-25** (Danny's idea: "have the most
+      popular foods/meals/combinations in the DB"). 5,431 foods as eaten
+      (`source='usda_fndds'`: "Peanut butter and jelly sandwich", "Grilled
+      cheese sandwich", "Lasagna with meat, home recipe" / "..., from
+      restaurant"), all with sugar/fiber, 99% with a standard portion ("1
+      sandwich" = 112 g) in `package_size`/`package_label`. Insert-only loader
+      `scripts/seed_foods_fndds.py`. **Search** now ranks generic foods (SR +
+      FNDDS) first and prefers the fewest extra words: "lasagna" was "IGA
+      LASAGNA", now "Lasagna"; "banana" was a branded "BANANA", now "Banana,
+      raw"; "white rice" -> "Rice, white, cooked". Brand queries unchanged.
+      Known gap: plurals ("eggs" doesn't match "Egg, whole").
+- [ ] **FNDDS in the parser: measured, not adopted.** Opt-in
+      `resolve: "fndds"` (parse-meal v26, `food_candidates_fndds`): model picks
+      an FNDDS/SR row + grams and sees its standard portion. Live, 5 runs:
+      easy 9.80% -> 10.26% (noise), **hard 4.92% -> 7.10%** (worse). Cause:
+      a restaurant bibimbap priced at FNDDS's "1 cup = 162 g" -> 123 kcal.
+      Survey portions are home/single-cup units and drag restaurant food
+      back into the undercount v19 fixed. Same verdict as 09-22's `foods`
+      mode: identity isn't the error, portion is. Would need to be offered
+      only for home dishes, with portions shown as a floor, before retrying.
 - [ ] **Space.** The in-place update left `foods` at 291 MB (was 154) until
       autovacuum reuses the dead rows; database 309 MB of 500. `VACUUM FULL
       foods` would reclaim it but needs ~160 MB free while it runs, so only

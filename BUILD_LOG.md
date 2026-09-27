@@ -5,6 +5,32 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-25 (later still) — FNDDS loaded; search ranks generic food first; FNDDS-in-parser measured
+
+- **Downloaded** `FoodData_Central_survey_food_csv_2024-10-31.zip` (3.3 MB,
+  fdc.nal.usda.gov; FNDDS 2021-2023, Danny's go-ahead) to `scripts/.cache/`.
+  Later-dated URLs 404; USDA's download page is JS-rendered.
+- **Trap:** FNDDS `food_nutrient.csv` puts the legacy nutrient *number* (208
+  kcal, 203 protein, 269 sugar, 291 fiber) in its `nutrient_id` column where
+  SR/Branded put the id (1008...). First dry run matched 0 foods.
+  `seed_foods_fndds.py` maps number -> id through FNDDS's own nutrient.csv.
+- **Loaded 5,431 rows**, source `usda_fndds`, insert-only (never deletes; see
+  the ON DELETE SET NULL trap). One REST 500 on the first try was transient
+  (autovacuum after the 400k-row update); retried clean.
+- **search_foods** (two migrations, the second supersedes): generic (SR +
+  FNDDS) first, then exact, prefix, fewest extra words in the first comma
+  segment, length. Before/after in ROADMAP. 281 ms for "chicken".
+- **food_candidates_fndds** + parse-meal **v26** `resolve: "fndds"` (opt-in;
+  the app's `estimate` path is byte-for-byte the same logic). Rows show
+  "| 1 sandwich = 112 g"; a picked row prices sugar/fiber from the row too.
+  Live 5 runs: easy estimate 9.80 / fndds 10.26 (se 0.58); hard 4.92 / 7.10
+  (se 1.35, one run 11.8%). 40 of 450 easy items took a row. The bad run:
+  bibimbap 162 g = 123 kcal (FNDDS "1 cup"), chili 400 g, beer 700 g.
+  Not adopted.
+- Migrations saved; `check_migrations.py` agrees; contamination check clean.
+
+---
+
 ## 2026-09-25 (late) — parse-meal v25: sugar and fiber reach the entry
 
 - **Function:** `sugar`, `fiber` added to the strict log_meal tool (required)
