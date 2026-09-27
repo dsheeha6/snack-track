@@ -460,9 +460,18 @@ target. Details under **Accuracy work** below.
       **sugar 1.9 g mean abs error, fiber 0.7 g.** Worst: ONE birthday cake bar,
       label 1 g sugar, model 9-17 g. Not yet displayed anywhere: which
       nutrients show is the goal-based question in QUESTIONS.md.
-- [ ] **Branded lookup (now unblocked).** `foods.package_size` exists, so a
-      packaged product can be priced as label x packages, menu-style.
-      Baseline to beat: `meals_branded.jsonl` 5.5%.
+- [x] **Packaged-product lookup — parse-meal v27/v28, 2026-09-25.** When a
+      sentence names a brand we hold, `product_candidates()` returns that
+      brand's matching products and parse-meal lists them per package ("one
+      package: 1 bar, 60 g | 220 cal"), picked through the same `menu` field
+      as chain lines; code multiplies the label. Guards: a brand counts only
+      with a sentence word in the product name, and brands that are food
+      words (`food_head_words`: GELATO, PISTACHIO, BREAD) need two; skipped
+      entirely when a chain matched. Measured at 5 runs on/off: **packaged
+      4.82% -> 1.94%** (se 0.30), sugar 1.6 -> 0.9 g; everyday and hard sets
+      got zero product lines, so their prompts were unchanged. Live v28:
+      packaged 1.9%, items 0.0%, everyday 9.3%. The ONE bar is now 1 g sugar
+      (label) instead of 9-17. App shows these as "from the label".
 - [x] **USDA FNDDS loaded — 2026-09-25** (Danny's idea: "have the most
       popular foods/meals/combinations in the DB"). 5,431 foods as eaten
       (`source='usda_fndds'`: "Peanut butter and jelly sandwich", "Grilled

@@ -110,7 +110,7 @@ def run_baseline(meals):
     return results
 
 
-def run_claude(meals, model=DEFAULT_MODEL, resolve="none", workers=8, menus=True):
+def run_claude(meals, model=DEFAULT_MODEL, resolve="none", workers=8, menus=True, products=True):
     """Score the real deployed parse-meal edge function.
 
     Deliberately calls the deployed function over HTTPS rather than
@@ -132,6 +132,7 @@ def run_claude(meals, model=DEFAULT_MODEL, resolve="none", workers=8, menus=True
             "resolve": resolve,
             "model": model,
             "menus": menus,
+            "products": products,
         }).encode()
         req = urllib.request.Request(
             endpoint,
@@ -343,6 +344,8 @@ def main():
     ap.add_argument("--resolve", choices=["none", "estimate", "db", "foods", "fndds"], default="none",
                     help="claude pipeline only: whether a `foods` match overrides "
                          "Claude's numbers (default none - score the parse alone)")
+    ap.add_argument("--no-products", action="store_true",
+                    help="claude pipeline only: skip packaged-product lines (parse-meal v27+, on by default)")
     ap.add_argument("--no-menus", action="store_true",
                     help="claude pipeline only: skip restaurant menus (public.restaurant_items), "
                          "to A/B them against the plain estimate")
@@ -356,7 +359,8 @@ def main():
 
     def one_pass():
         if args.pipeline == "claude":
-            return run_claude(meals, model=args.model, resolve=args.resolve, menus=not args.no_menus)
+            return run_claude(meals, model=args.model, resolve=args.resolve, menus=not args.no_menus,
+                              products=not args.no_products)
         return PIPELINES[args.pipeline](meals)
 
     if args.repeat > 1:

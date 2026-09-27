@@ -5,6 +5,42 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-25 (night, last) — packaged-product lookup: v27 measured, v28 on by default
+
+- **Design:** chain-menu mechanism reused. `brand_key()` (normalised brand,
+  expression-indexed over branded rows) + `product_candidates(q)`: the
+  sentence's 1-3 word grams (and word pairs run together, "rx bar") matched
+  against brands, products ranked by sentence words in the name, per-brand
+  cap 6, 24 lines max. parse-meal lists them after any chain lines as
+  "L7 | RXBAR | ... | one package: 1 bar (52g), 52 g | 210 cal" under
+  PRODUCT_RULES (brand-as-ordinary-word, form must match: a bar is not a
+  powder, count is packages). Picks go through the existing `menu` field;
+  all-product picks get `source: "package"`, and sugar/fiber come from the
+  label when present. Skipped when a chain matched.
+- **Speed:** first SQL version took **9.7 s** (hash join over 400k rows);
+  plpgsql with grams in an array and `brand_key(brand) = any(array)` probes
+  the index: 55 ms warm.
+- **A/B 1 (opt-in deploy, 5 runs on/off):** packaged 4.82 -> 3.74; easy
+  9.80 -> 10.20; hard 4.96 -> 5.38 with **one false pick**: h01 "gelato" at
+  a restaurant -> brand GELATO, 118 ml pint. Fixed in two passes:
+  `food_head_words` (every 4+ letter word in SR/FNDDS names + first
+  segments, 4,973) makes food-word brands need two matching words; the
+  6+-letter bare-brand exception is gone (it let TRATTORIA in). "a celsius"
+  now falls back to the estimate, which was already exact.
+- **A/B 2 (tightened):** packaged **1.94%** (se 0.30 vs 4.82), sugar 0.9 g,
+  fiber 0.6 g; easy 10.30 / hard 5.68 with **zero** product lines on either
+  set, i.e. identical prompts: noise. Flipped on by default (v28).
+  `run.py --no-products` to A/B from here.
+- **Live v28:** packaged 2.0 / 1.7%, item names 0.0%, easy 9.3%. RXBAR logs
+  200 not 210: USDA holds two label versions of that bar.
+- Security advisor flagged `brand_key` search_path; pinned to pg_catalog.
+  Only leaked-password protection remains. Migrations saved (the two
+  superseded function bodies are noted in their files; the last file holds
+  the final definition); `check_migrations.py` agrees; contamination clean.
+- App: `source: 'package'` -> "from the label". `tsc` clean.
+
+---
+
 ## 2026-09-25 (later still) — FNDDS loaded; search ranks generic food first; FNDDS-in-parser measured
 
 - **Downloaded** `FoodData_Central_survey_food_csv_2024-10-31.zip` (3.3 MB,

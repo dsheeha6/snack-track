@@ -20,8 +20,9 @@ export type ParsedItem = {
    * `personal` — these are the user's own corrected numbers, not an estimate.
    * `restaurant` — summed from the chain's published nutrition (parse-meal's
    * restaurant menus, 2026-09-21); matched_name says which menu lines.
+   * `package` — a packaged product priced from its label (parse-meal v27).
    */
-  source: 'estimate' | 'database' | 'personal' | 'restaurant';
+  source: 'estimate' | 'database' | 'personal' | 'restaurant' | 'package';
   confidence: 'high' | 'medium' | 'low';
   food_id: string | null;
   matched_name: string | null;
@@ -150,6 +151,7 @@ function round1(n: number): number {
 export function confidenceNote(item: ParsedItem): string | null {
   if (item.source === 'personal') return 'your numbers';
   if (item.source === 'restaurant') return 'from the menu';
+  if (item.source === 'package') return 'from the label';
   if (item.confidence === 'high') return null;
   if (item.confidence === 'medium') return 'estimated portion';
   return 'rough estimate';
