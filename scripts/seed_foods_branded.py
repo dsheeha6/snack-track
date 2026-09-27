@@ -36,6 +36,11 @@ Usage:
     python scripts/seed_foods_branded.py --cap 30
     python scripts/seed_foods_branded.py --cap 30 --limit 20000   # sample load
 
+WARNING (2026-09-25): clearing deletes rows, and entries.food_id is ON DELETE
+SET NULL, so a re-run unlinks every logged entry that matched a branded food.
+It also doesn't write sugar/fiber/package columns; scripts/add_sugar_fiber.py
+fills those in place. Prefer that script for anything short of a full rebuild.
+
 Idempotent: clears source='usda_branded' before loading, so re-running with a
 different --cap replaces the set cleanly and never touches the SR Legacy rows
 (source='usda') that seed_foods_usda.py owns.

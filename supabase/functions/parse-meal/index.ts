@@ -121,9 +121,9 @@ Rules that matter:
 - Word-numbers are numbers. "half a dozen" is 6, "a couple" is 2.
 - When no amount is stated, assume one typical serving and say so by setting
   confidence to "medium" — do not refuse and do not return zeros. "a bowl of
-  oatmeal" is about a cup cooked.
-- For chains, use that chain's actual published nutrition. A Chipotle chicken
-  burrito bowl is not a generic burrito bowl.
+  grits" is about a cup cooked.
+- For chains, use that chain's actual published nutrition. A Panera broccoli
+  cheddar soup is not a generic cheese soup.
 - Most restaurants are not chains and publish nothing, and a serving there is a
   restaurant serving. Kitchens cook with far more butter, oil, cheese and cream
   than a home cook does, and plate more of it: a restaurant portion is commonly

@@ -438,10 +438,30 @@ target. Details under **Accuracy work** below.
 
 ### Tier 2 — the schema change that gets costlier the longer it waits
 
-- [ ] **Sugar + fiber together** (Danny confirmed 2026-08-22). Three tables,
-      `WANT_NUTRIENTS` in three seeder files that must change as a set, and a
-      re-seed measured in tens of minutes. Cheapest while Danny is the only
-      person with data. Full scope in QUESTIONS.md.
+- [x] **Sugar + fiber + package size — done 2026-09-25** (Danny's go-ahead).
+      Migration `add_sugar_fiber_package`: `sugar`, `fiber` on `foods`,
+      `entries`, `personal_foods`; `package_size` / `package_unit` /
+      `package_label` on `foods`. **Filled in place, not re-seeded** — the
+      seeders delete and reinsert, and `entries.food_id` is ON DELETE SET NULL,
+      so a re-seed would have unlinked all 27 matched entries.
+      `scripts/add_sugar_fiber.py` staged the two nutrients, rebuilt the
+      seeder's exact keys, and a join updated all **407,086 rows 1:1**. Coverage:
+      branded sugar 96%, fiber 87%, package 99%; SR Legacy sugar 77%, fiber 93%.
+      NULL = unknown, never 0. Spot checks: RXBAR 52 g = 210 kcal / 13 g sugar /
+      5 g fiber (label); banana 12.2 / 2.6 per 100 g. 27 entries still linked.
+- [ ] **Sugar/fiber reach the user.** The columns exist and `foods` is full,
+      but nothing writes `entries.sugar/fiber` yet: parse-meal returns four
+      macros, the Add food sheet saves four. Next: add sugar/fiber to the
+      log_meal tool and the save path, then the goal-based display (QUESTIONS.md
+      -> "Goal-based nutrient tracking"). Measure the tool change on the evals
+      first; a bigger schema can move calorie accuracy.
+- [ ] **Branded lookup (now unblocked).** `foods.package_size` exists, so a
+      packaged product can be priced as label x packages, menu-style.
+      Baseline to beat: `meals_branded.jsonl` 5.5%.
+- [ ] **Space.** The in-place update left `foods` at 291 MB (was 154) until
+      autovacuum reuses the dead rows; database 309 MB of 500. `VACUUM FULL
+      foods` would reclaim it but needs ~160 MB free while it runs, so only
+      when there's headroom.
 
 ### Tier 3 — only after the above
 

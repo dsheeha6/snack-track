@@ -28,7 +28,10 @@ DB_PATH = CACHE_DIR / "branded.sqlite"
 
 # Same four USDA nutrient IDs the SR Legacy seeder uses, so both sources land
 # in public.foods with identical semantics (all values per 100g).
-WANT_NUTRIENTS = {"1008": "calories", "1003": "protein", "1004": "fat", "1005": "carbs"}
+# Sugar (2000) and fiber (1079) since 2026-09-25. Keep this dict identical in
+# seed_foods_usda.py, stage_branded.py and add_sugar_fiber.py.
+WANT_NUTRIENTS = {"1008": "calories", "1003": "protein", "1004": "fat", "1005": "carbs",
+                  "2000": "sugar", "1079": "fiber"}
 
 csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 

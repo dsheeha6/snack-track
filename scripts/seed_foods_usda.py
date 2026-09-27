@@ -29,7 +29,10 @@ DATASET_URL = "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_
 DATASET_ZIP = CACHE_DIR / "sr_legacy.zip"
 DATASET_DIR_NAME = "FoodData_Central_sr_legacy_food_csv_2018-04"
 
-WANT_NUTRIENTS = {"1008": "calories", "1003": "protein", "1004": "fat", "1005": "carbs"}
+# Sugar (2000) and fiber (1079) since 2026-09-25. Keep this dict identical in
+# seed_foods_usda.py, stage_branded.py and add_sugar_fiber.py.
+WANT_NUTRIENTS = {"1008": "calories", "1003": "protein", "1004": "fat", "1005": "carbs",
+                  "2000": "sugar", "1079": "fiber"}
 BATCH_SIZE = 500
 
 csv.field_size_limit(sys.maxsize)
@@ -111,6 +114,9 @@ def build_rows(data_dir):
                 "protein": round(n.get("protein", 0), 1),
                 "carbs": round(n.get("carbs", 0), 1),
                 "fat": round(n.get("fat", 0), 1),
+                # Unknown stays NULL, never 0.
+                "sugar": round(n["sugar"], 1) if "sugar" in n else None,
+                "fiber": round(n["fiber"], 1) if "fiber" in n else None,
                 "source": "usda",
             }
         )

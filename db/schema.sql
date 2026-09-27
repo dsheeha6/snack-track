@@ -69,6 +69,8 @@ create table public.entries (
   protein numeric(6,1) not null default 0,
   carbs numeric(6,1) not null default 0,
   fat numeric(6,1) not null default 0,
+  sugar numeric(6,1),          -- NULL = unknown, never 0 (2026-09-25)
+  fiber numeric(6,1),
   source entry_source not null default 'manual',
   note text,
   -- food_id is added after `foods` is created, below.
@@ -92,6 +94,13 @@ create table public.foods (
   protein numeric(6,1) not null default 0,
   carbs numeric(6,1) not null default 0,
   fat numeric(6,1) not null default 0,
+  -- Per 100 g / 100 ml like the macros; NULL = unknown (2026-09-25).
+  sugar numeric(6,1),
+  fiber numeric(6,1),
+  -- One package or labelled serving, branded rows only: 52 g, "1 bar (52g)".
+  package_size numeric(7,1),
+  package_unit text check (package_unit in ('g', 'ml')),
+  package_label text,
   high_variance boolean not null default false,
   source text not null default 'usda',
   created_at timestamptz not null default now()
@@ -126,6 +135,8 @@ create table public.personal_foods (
   protein numeric(6,1) not null default 0,
   carbs numeric(6,1) not null default 0,
   fat numeric(6,1) not null default 0,
+  sugar numeric(6,1),
+  fiber numeric(6,1),
   times_used int not null default 1,
   last_used_at timestamptz not null default now(),
   created_at timestamptz not null default now(),

@@ -5,6 +5,53 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-25 (night) — v24 live; sugar, fiber and package size in the database
+
+**parse-meal v24 deployed** (Danny's yes). Live x3 on the corrected easy set:
+9.1 / 9.4 / 10.5% = **9.7%** (v23 9.9%), 7 chain meals exact, item-name set
+0.0%. `check_contamination.py` is clean against the live prompt.
+
+**Tier 2 done: sugar + fiber (+ package size) — without a re-seed.**
+
+- **Why not the planned re-seed:** both seeders DELETE their source and
+  reinsert, and `entries.food_id` references `foods(id)` ON DELETE SET NULL.
+  A re-seed would have quietly unlinked every matched entry (27: 18 whole
+  foods, 9 branded). Warning added to `seed_foods_branded.py`.
+- **Migration `add_sugar_fiber_package`:** nullable `sugar`, `fiber` on
+  `foods`, `entries`, `personal_foods`; `package_size`, `package_unit`
+  ('g'|'ml'), `package_label` on `foods`; plus a scratch
+  `foods_nutrient_load` (RLS on, no grants), dropped after by
+  `drop_foods_nutrient_load`.
+- **`scripts/add_sugar_fiber.py`:** `stage` streamed only nutrients 2000/1079
+  for the 796k candidate products out of the 1.5 GB CSV (1.43M values);
+  `build` replays `seed_foods_branded.SELECT` with fdc_id + serving columns so
+  the (brand, name, barcode) keys are byte-identical to what was inserted.
+  First build used the seeder's default `--cap 30` and produced 201k rows;
+  the 08-23 load was **uncapped** (BUILD_LOG 08-23), which gave exactly
+  399,293. `upload` POSTed 407,086 rows. Then a join: 407,086 matched,
+  407,086 join rows (1:1), updated in five statements (one call died on a
+  network error and had not applied; checked before retrying).
+- **Coverage:** branded sugar 384,623 / fiber 349,215 / package 394,670 of
+  399,293; SR Legacy sugar 6,007 / fiber 7,231 of 7,793.
+- **Checked:** RXBAR Chocolate Sea Salt 404 kcal/100 g x 52 g = 210 kcal,
+  sugar 13 g, fiber 5 g (the label); Bananas, raw 12.2 g sugar / 2.6 g fiber
+  per 100 g (USDA). 27 entries still linked. Security advisor unchanged (only
+  leaked-password protection). `check_migrations.py`: repo and database agree.
+- **Repo drift fixed:** `20260923014547_add_food_candidates` was applied but
+  never committed; recovered from `supabase_migrations.schema_migrations`.
+  Also: the sqlite `candidates` table the branded seeder reads was built by a
+  step that isn't in any script. It's cached and intact; rebuilding the cache
+  from scratch would need that step reconstructed.
+- **Size:** `foods` 154 -> 291 MB (dead tuples), database 309 MB of 500.
+  Left for autovacuum; `VACUUM FULL` needs ~160 MB free while running.
+- `WANT_NUTRIENTS` now includes sugar/fiber in `seed_foods_usda.py` and
+  `stage_branded.py`, and the SR seeder writes them.
+
+**Not done yet:** nothing writes `entries.sugar/fiber` — the parse returns
+four macros and the app saves four. That's the next step (ROADMAP Tier 2).
+
+---
+
 ## 2026-09-25 (evening) — answer key fixed, chain item names, packaged products measured, leak check
 
 - **Answer key.** m47, m14, m49 corrected (Danny's OK; QUESTIONS.md). Rescored:

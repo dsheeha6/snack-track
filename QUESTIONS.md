@@ -8,18 +8,6 @@ answers, acts on them, and moves the item to ANSWERED.
 
 ## OPEN
 
-### Deploy the leak-free prompt (v24)? (2026-09-25)
-The live prompt teaches "a bowl of oatmeal is about a cup cooked", which is
-eval meal m21's exact answer, and uses a Chipotle burrito bowl example that
-overlaps two eval meals. That makes our scores look a little better than they
-are. v24 swaps in examples no eval uses (grits, a Panera soup). Measured: easy
-set 11.3% vs 10.5% at 10 runs, a difference that is within noise, and the
-oatmeal meal itself didn't move. For you, logging food, it's a wash; for
-trusting the numbers, v24 is cleaner. Recommend: deploy it and treat its score
-as the honest baseline. Yes/no?
-
-**Danny:**
-
 ### Two calls on the restaurant data (2026-09-21)
 1. ~~CAVA PDF~~ answered 2026-09-21: yes, downloaded and parsed.
 2. **Most chains come via Nutritionix's public pages.** The numbers match the
@@ -77,6 +65,11 @@ re-parsing its 1.5GB `food_nutrient.csv` (~10 min) and re-uploading ~399k rows
 automated — just budget the time, and don't do it twice, which is exactly why
 sugar and fiber go in together.
 
+**Update 2026-09-25: the data side is DONE.** Sugar and fiber are on
+`entries`, `foods` and `personal_foods`, and all 407k foods are filled (in
+place, no re-seed; see BUILD_LOG). What's left is only the part below that
+was always yours: which nutrients each goal shows.
+
 **Danny confirmed fiber on 2026-08-22:** add **sugar and fiber together**, not
 sugar alone. One migration and one re-seed instead of two. So when this phase
 starts, `entries`, `foods`, and `personal_foods` each get a `sugar` and a `fiber`
@@ -93,6 +86,10 @@ so the hook this needs will already exist by the time this phase starts.
 ---
 
 ## ANSWERED
+
+### Deploy the leak-free prompt (v24)? — yes, deployed 2026-09-25
+Live as parse-meal v24. Live check: easy 9.7% (v23 9.9%), chains exact,
+item names 0.0%.
 
 ### Three easy-set answers — fixed 2026-09-25
 Danny: "yes fix those three answers". m47 beans 227 -> 114, m14 half avocado
