@@ -5,6 +5,21 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-25 (night, bread) — the bread double count is gone under Sonnet; closed without a change
+
+Danny asked for the code-level dedupe and to spend API frugally, so this was
+checked against the 25 h01 parses already saved tonight (fx_*, px_*, px2_*)
+before writing anything. Truth: one "bread service (includes the baguette),
+with butter", band 260-450 kcal. Sonnet's bread+butter per run: 22 of 25 in
+band, 3 at 470-500; median ~400. Two-item runs are "Baguette" + "Bread service
+butter" (bread and its butter), and 1-item runs are "Baguette with bread
+service". The Haiku-era failure (two breads, ~460 over) no longer occurs. A
+merge rule would mostly have merged butter into bread or, as the 09-22 prompt
+attempt did, eaten h15's second helping. h01's real gap is elsewhere (total
+median 3,460 vs 4,560-5,364). API calls spent on this item: 0.
+
+---
+
 ## 2026-09-25 (night, coda) — search handles plurals
 
 `search_foods` matched every word as typed, so "eggs" never found "Egg,

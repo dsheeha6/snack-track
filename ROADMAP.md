@@ -427,10 +427,15 @@ target. Details under **Accuracy work** below.
       *Original note:* The 15.1% vs 10.2% gap recorded
       earlier on 09-20 is 4.9 points against a 6.1-point spread — it is not a
       result. Re-run both at `--repeat 10` before spending anything on the tier.
-- [ ] **The baguette / bread-service dedupe bug.** The prompt fix was rejected
-      2026-09-22 (worse on both sets, and it merged h15's second helping of
-      chips; BUILD_LOG). If retried, do it in code, not prompt wording. Currently masked by the
-      bias. Expect h01 to move oddly before it moves right.
+- [x] **The baguette / bread-service dedupe bug — closed 2026-09-25, no
+      change needed.** Checked offline against 25 saved Sonnet runs of h01
+      (no new API spend): bread + butter lands **in the 260-450 kcal truth
+      band in 22 of 25** (the other three 470-500). The two-line form is now
+      "Baguette" + "Bread service butter", i.e. bread plus its butter, not two
+      breads. A code merge would now only risk collapsing real items (the
+      butter; h15's genuine second helping of chips) and push h01, already
+      ~1,100 kcal under on its burger and plates, further down. Reopen only if
+      a run shows two *breads* summing well over 450.
 - [x] **Never put eval-set dishes in the prompt.** The first v14 draft named
       pommes aligot, adjaruli khachapuri and the baguette/bread-service pair —
       caught before deploying. `scripts/check_contamination.py` now checks it
