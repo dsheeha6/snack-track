@@ -5,6 +5,18 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-25 (night, coda) — search handles plurals
+
+`search_foods` matched every word as typed, so "eggs" never found "Egg,
+whole". Words now match on a light stem (-ies/-oes/-s trimmed; -ss/-us/-is
+kept, so "hummus" is safe; length guards keep "fries"). New rank key: the
+row's first word is the stem, which fixed "chips" -> "Chipotle dip". Checked:
+apples, tomatoes, blueberries, oats, grits, bananas, chips correct; brand
+queries (quest bar, chobani, oreo) unchanged. "eggs" still leads with "Eggs,
+scrambled, frozen mixture" (literal prefix) with real eggs next.
+
+---
+
 ## 2026-09-25 (night, last) — packaged-product lookup: v27 measured, v28 on by default
 
 - **Design:** chain-menu mechanism reused. `brand_key()` (normalised brand,

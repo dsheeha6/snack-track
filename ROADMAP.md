@@ -482,7 +482,9 @@ target. Details under **Accuracy work** below.
       FNDDS) first and prefers the fewest extra words: "lasagna" was "IGA
       LASAGNA", now "Lasagna"; "banana" was a branded "BANANA", now "Banana,
       raw"; "white rice" -> "Rice, white, cooked". Brand queries unchanged.
-      Known gap: plurals ("eggs" doesn't match "Egg, whole").
+      Plurals fixed the same night (`search_foods_plurals`): "eggs",
+      "apples", "blueberries" now match their singular USDA names, and
+      "chips" no longer returns "Chipotle dip" first.
 - [ ] **FNDDS in the parser: measured, not adopted.** Opt-in
       `resolve: "fndds"` (parse-meal v26, `food_candidates_fndds`): model picks
       an FNDDS/SR row + grams and sees its standard portion. Live, 5 runs:

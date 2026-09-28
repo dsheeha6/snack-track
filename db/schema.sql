@@ -236,10 +236,10 @@ create policy "own suggestion feedback" on public.suggestion_feedback
 -- "order by name limit 20" buries the row you asked for under whichever brand
 -- happens to sort first. Matches every word in any order (people type
 -- "quest protein bar", the row is "PROTEIN BAR" / brand "QUEST BAR"), then
--- ranks: generic foods (SR Legacy + FNDDS) first, then exact name, prefix,
--- fewest extra words, shortest (2026-09-25; see the generic_first migration).
+-- ranks: generic foods (SR Legacy + FNDDS) first, then exact name, prefix, first
+-- word is the (de-pluralised) stem, fewest extra words, shortest (2026-09-25).
 -- security invoker, so the caller's RLS on public.foods still applies.
-create or replace function public.search_foods(q text, lim int default 20)
+create or replace function public.search_foods(q text, lim integer default 20)
 returns setof public.foods
 language sql
 stable
@@ -247,20 +247,24 @@ set search_path = public, extensions
 as $$
   with parsed as (
     select btrim(lower(q)) as needle,
-           (array_remove(string_to_array(btrim(lower(q)), ' '), ''))[1] as first_word,
-           array(select '%' || w || '%'
+           array(select case
+                          when length(w) > 5 and w ~ 'ies$' then left(w, -3)
+                          when length(w) > 4 and w ~ 'oes$' then left(w, -2)
+                          when length(w) > 3 and w ~ 's$' and w !~ '(ss|us|is)$' then left(w, -1)
+                          else w end
                  from unnest(string_to_array(btrim(lower(q)), ' ')) as w
-                 where w <> '') as pats
+                 where w <> '') as stems
   )
   select f.*
   from public.foods f, parsed p
   where length(p.needle) >= 2
-    and f.search_text ilike '%' || p.first_word || '%'
-    and f.search_text ilike all (p.pats)
+    and f.search_text ilike '%' || p.stems[1] || '%'
+    and f.search_text ilike all (array(select '%' || s || '%' from unnest(p.stems) as s))
   order by
     (f.source in ('usda', 'usda_fndds')) desc,
     (lower(f.name) = p.needle) desc,
     (lower(f.name) like p.needle || '%') desc,
+    (lower(f.name) ~ ('^' || p.stems[1] || '(s|es|ies|y|ie)?\y')) desc,
     (select count(*)
        from unnest(regexp_split_to_array(lower(split_part(f.name, ',', 1)), '[^a-z0-9]+')) as w
       where length(w) >= 2 and position(w in p.needle) = 0) asc,
