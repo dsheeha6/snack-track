@@ -12,12 +12,12 @@ import sys
 
 from common import OUT
 from nix import menu
-from nutritionix_chains import CHAINS
+from nutritionix_chains import CHAINS, REPLACED
 
 
 def main():
     short = []
-    for slug in sys.argv[1:] or CHAINS:
+    for slug in sys.argv[1:] or [s for s in CHAINS if s not in REPLACED]:
         f = OUT / f"{slug}.jsonl"
         have = sum(1 for _ in open(f, encoding="utf-8")) if f.exists() else 0
         try:

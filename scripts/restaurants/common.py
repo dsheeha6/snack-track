@@ -10,6 +10,7 @@ Build-your-own chains (Chipotle, CAVA, Sweetgreen) are listed per ingredient
 portion, because that is how they publish it and how people order.
 """
 
+import html
 import json
 import re
 import urllib.request
@@ -45,11 +46,22 @@ def num(v):
     return float(m.group()) if m else None
 
 
+def clean_name(s):
+    """HTML entities (Nutritionix writes &#145;N) and curly quotes to plain text."""
+    s = html.unescape(s)
+    s = re.sub(r"&#(\d+);", lambda m: bytes([int(m.group(1))]).decode("cp1252", "replace")
+               if int(m.group(1)) < 256 else "", s)
+    s = s.translate(str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"',
+                                   "–": "-", "—": "-", "": "'", "": "'"}))
+    s = s.replace("•", " ").replace("†", " ").replace("‡", " ")  # footnote marks
+    return re.sub(r"\s+", " ", s.replace("®", "").replace("™", "")).strip()
+
+
 def row(chain, category, item, source_url, *, size="", serving_g=None, **macros):
     r = {
         "chain": chain,
         "category": category,
-        "item": re.sub(r"\s+", " ", item.replace("®", "").replace("™", "")).strip(),
+        "item": clean_name(item),
         "size": size,
         "serving_g": num(serving_g),
     }
@@ -108,3 +120,43 @@ def write(slug, rows):
         for s in suspicious[:15]:
             print("   ", s)
     return uniq
+
+
+NUMTOK = r"(<\s?\d+(?:\.\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|-)"
+
+
+def pdf_rows(path, ncols, *, is_header=None, on_header=None, trailing_junk=r"(\s+X)+\s*$"):
+    """Yield (text_before_numbers, [ncols numbers], preceding_text_lines) from a
+    nutrition-guide PDF where each item is its name followed by exactly `ncols`
+    numbers. Names that wrap onto several lines are joined back up: lines that
+    don't end in the numbers are held and prefixed to the next row. The held
+    lines are also passed out, so a fetcher can read section headings from them.
+    `is_header(line)` marks column-header lines, which clear the held text;
+    `on_header(held)` sees that text first (usually the section heading)."""
+    from pypdf import PdfReader
+
+    row_re = re.compile(r"^(.*?)\s*" + r"\s+".join([NUMTOK] * ncols) + r"$")
+    held = []
+    for page in PdfReader(path).pages:
+        for line in (page.extract_text() or "").splitlines():
+            line = re.sub(r"\s+", " ", clean_name(line).replace("�", "'")).strip()
+            if trailing_junk:
+                line = re.sub(trailing_junk, "", line).strip()
+            line = re.sub(r"(?<=\d)\+(?=\s|$)", "", line)  # "0+" (a footnoted zero)
+            if not line:
+                continue
+            if is_header and is_header(line):
+                if on_header and held:
+                    on_header(held)
+                held = []
+                continue
+            # Match against everything held so far plus this line, so a name
+            # that wraps *and* a number run that wraps both come back whole.
+            m = row_re.match(" ".join(held + [line]))
+            if m:
+                yield m.group(1).strip(), [None if v == "-" else v.replace(" ", "").replace(",", "") for v in m.groups()[1:]], held
+                held = []
+            else:
+                held.append(line)
+                if len(held) > 6:  # a heading block or page furniture, not one row
+                    held = held[-6:]

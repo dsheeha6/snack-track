@@ -46,8 +46,14 @@ CHAINS = {
 }
 
 
+# Chains now fetched from their own published numbers (see SOURCES.md). They stay
+# in CHAINS so an explicit `python nutritionix_chains.py dunkin` can still pull
+# a comparison copy, but a no-argument run must never overwrite them.
+REPLACED = {"arbys", "dunkin", "el-pollo-loco"}
+
+
 def main():
-    slugs = sys.argv[1:] or list(CHAINS)
+    slugs = sys.argv[1:] or [s for s in CHAINS if s not in REPLACED]
     for slug in slugs:
         chain = CHAINS[slug]
         try:
