@@ -20,7 +20,9 @@ The core loop is: say what you ate, see where you are. Everything else is
 secondary and should stay out of the way until asked for.
 
 - If a feature needs a tutorial, it's too complicated.
-- Default screens show calories and the three macros. Nothing else.
+- Default screens show what your goal needs and nothing else: calories plus the
+  macros (and fiber) your goal's preset picks. Sugar and the rest are opt-in.
+  (Danny's call 2026-09-28; it replaced "calories and the three macros".)
 - No feature gets added to the main screen without one being considered for removal.
 - Micronutrients, glycemic index, food grades, meal timing science — no. Not a
   "later" — a no.

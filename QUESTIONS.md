@@ -16,7 +16,18 @@ answers, acts on them, and moves the item to ANSWERED.
    testing. Before launch it's your call: license it, or replace each chain with
    its own site as the Chipotle/McDonald's/Chick-fil-A fetchers do.
 
-**Danny:**
+**Danny (2026-09-28):** figure out how MyFitnessPal, Cal AI and the rest get
+their data; look at the legality and other ways to get and keep it.
+
+**Answer:** `docs/food-data-sourcing.md`. Short version: nutrition facts
+aren't copyrightable, and chains with 20+ locations are required by the FDA to
+publish them, so the chains' own pages are free and clean. The risk with
+Nutritionix is its terms of service, not copyright. Recommendation: before
+launch, rewrite the 57 Nutritionix chains as per-chain fetchers (same numbers),
+record `source_url` + `fetched_at`, and grow our own verified data through
+label scanning. FatSecret's free tier is the legal fallback for the long tail.
+**Left for you:** OK to start the per-chain rewrite (it's the next data job
+after accuracy), and a one-hour lawyer consult before Phase 8.
 
 ### One dashboard toggle: leaked-password protection (30 seconds, yours to click)
 The Supabase security advisor is clean except for this one, and it's been there
@@ -34,58 +45,28 @@ last open item in Tier 0 of the backend-first plan (ROADMAP → Backend first).
 Everything else in that tier is done and verified. Flip this and the backend is
 clean.
 
-**Danny:**
-
-### Goal-based nutrient tracking — scope it into its own phase, don't sneak it into 2
-From Danny's drinks answer: track more than the four macros (he named sugar), and
-have onboarding ask the user's goals, then recommend or show only what's relevant
-to that goal. This is a good idea and it is not a Phase 2 task — Phase 2 is half
-done and this would swallow it whole. Put it in the roadmap as its own phase.
-
-Two things worth knowing before anyone plans it:
-
-**The profile side is mostly already modeled.** `profiles` already has `goal`
-(goal_type), `onboarded_at`, `hide_calorie_numbers`, and `food_preferences jsonb`.
-Which nutrients a user sees can live in `food_preferences` with no migration at
-all — so the "ask your goals, show what matters" idea is largely a UI and
-onboarding job, not a schema job.
-
-**The nutrient side is a real migration.** Sugar would need a column on three
-tables — `entries`, `foods`, `personal_foods` — plus a re-seed, because the
-seeders only pull four USDA nutrient IDs today (1008 calories, 1003 protein,
-1004 fat, 1005 carbs). Total sugars is 2000 and fiber is 1079.
-
-**This got bigger on 2026-08-23**, when ~399k branded foods were loaded. The
-re-seed is now three steps, not one, and `WANT_NUTRIENTS` appears in *three*
-files that must be changed together:
-`scripts/seed_foods_usda.py`, `scripts/stage_branded.py`, and the selection in
-`scripts/seed_foods_branded.py`. Re-staging the branded dataset means
-re-parsing its 1.5GB `food_nutrient.csv` (~10 min) and re-uploading ~399k rows
-(~20 min) on top of the cheap 7,793-row SR Legacy re-seed. Still entirely
-automated — just budget the time, and don't do it twice, which is exactly why
-sugar and fiber go in together.
-
-**Update 2026-09-25: the data side is DONE.** Sugar and fiber are on
-`entries`, `foods` and `personal_foods`, and all 407k foods are filled (in
-place, no re-seed; see BUILD_LOG). What's left is only the part below that
-was always yours: which nutrients each goal shows.
-
-**Danny confirmed fiber on 2026-08-22:** add **sugar and fiber together**, not
-sugar alone. One migration and one re-seed instead of two. So when this phase
-starts, `entries`, `foods`, and `personal_foods` each get a `sugar` and a `fiber`
-column, and `WANT_NUTRIENTS` in the seeder gains `"2000": "sugar"` and
-`"1079": "fiber"` before the re-seed.
-
-The rest of this item — which nutrients each goal surfaces, and the onboarding
-flow that asks — is still unscoped and still Danny's call. **Note 2026-08-24:**
-the onboarding screens are being built now (Phase 3) and screen 4 asks the goal,
-so the hook this needs will already exist by the time this phase starts.
+**Danny (2026-09-28):** turning it on. **Still reported off by the advisor at
+02:14 UTC 09-29**, so check the toggle actually saved (it sits behind a Save
+button, and on some plans it needs Pro; if the switch is greyed out, that's why,
+and it can wait for launch). A new advisor finding the same night,
+`rls_auto_enable()` exposed over RPC, was Supabase's own event trigger and is
+fixed (migration `revoke_rls_auto_enable_execute`).
 
 **Danny:**
 
 ---
 
 ## ANSWERED
+
+### Goal-based nutrient tracking — built 2026-09-28
+Danny: presets per goal (cut, bulk, recomp, maintain) showing what matters for
+that goal, plus the option to add or drop anything. Built: `lib/nutrients.ts`
+and the "choose what you track" sheet on Today. Cut = calories, protein, fiber;
+Bulk = calories, protein, carbs; Recomp = calories plus the three macros;
+Maintain (also "Just curious") = the three macros plus fiber. Sugar is opt-in
+everywhere. Fiber defaults to 14 g per 1,000 kcal and sugar to 10% of calories,
+and both can be edited. Stored in `profiles.food_preferences.nutrients`, so no
+migration. Onboarding's numbers screen says what the goal will show.
 
 ### Deploy the leak-free prompt (v24)? — yes, deployed 2026-09-25
 Live as parse-meal v24. Live check: easy 9.7% (v23 9.9%), chains exact,

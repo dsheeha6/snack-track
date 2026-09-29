@@ -411,15 +411,10 @@ target. Details under **Accuracy work** below.
       plan is: add `package_grams` / `package_label` columns in the Tier 2
       sugar+fiber migration and load them in the same re-seed, then a
       menu-style branded lookup. Don't do the re-seed twice.
-- [ ] **Contamination check exists; one decision pending.**
-      `scripts/check_contamination.py` (exit 1 on any hit) found the prompt
-      teaching "a bowl of oatmeal is about a cup cooked" (eval m21's exact
-      answer) and a Chipotle burrito bowl example overlapping m16/m38. The
-      reworded prompt is `evals/variants/v24_no_leaks.ts` (grits, a Panera
-      soup): 10 runs, easy 11.31% vs v23 10.52% (+0.8, se 0.41, not
-      significant; scattered, m21 itself unhurt), hard 5.06% vs 4.65% (5
-      runs). **Not deployed — Danny's call** (QUESTIONS.md). Until then the
-      check reports those 3 hits against the live prompt.
+- [x] **Contamination check + leak-free prompt** — `scripts/check_contamination.py`
+      found eval answers taught in the prompt; the reworded prompt (v24) was
+      approved by Danny and deployed 2026-09-25 (easy 9.7%, chains exact).
+      Run the check before any prompt deploy.
 - [ ] **Remaining error is portion, not food identity.** The worst easy-set
       meals (tortillas + beans, waffles, pancakes, "a big bowl of pasta")
       have the right food and the wrong amount. This is the next accuracy
@@ -503,6 +498,14 @@ target. Details under **Accuracy work** below.
       autovacuum reuses the dead rows; database 309 MB of 500. `VACUUM FULL
       foods` would reclaim it but needs ~160 MB free while it runs, so only
       when there's headroom.
+
+### Goal-based nutrients ✅ built 2026-09-28
+Each goal gets a preset of what shows on Today (cut: calories/protein/fiber;
+bulk: calories/protein/carbs; recomp: the four; maintain: the four plus
+fiber), and "choose what you track" adds or drops anything, sugar included.
+Needs a look on Danny's phone. Data sourcing for launch is in
+`docs/food-data-sourcing.md` (replace the 57 Nutritionix chains with per-chain
+fetchers before Phase 8).
 
 ### Tier 3 — only after the above
 

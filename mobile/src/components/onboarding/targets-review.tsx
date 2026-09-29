@@ -16,6 +16,7 @@ import {
   type Goal,
   type TargetResult,
 } from '@/lib/targets';
+import { NUTRIENT_INFO, PRESETS, presetForGoal } from '@/lib/nutrients';
 import type { FinalTargets, OnboardingDraft } from '@/lib/onboarding';
 
 const TIER_LABELS: Record<ActivityTier, string> = {
@@ -179,11 +180,24 @@ export function TargetsReview({ step, total, draft, targets, saving, error, onBa
         </ThemedText>
       ) : null}
 
+      <ThemedView type="backgroundElement" style={styles.card}>
+        <ThemedText type="smallBold">What you'll see each day</ThemedText>
+        <ThemedText type="small">{trackedList(draft.goal)}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {PRESETS[presetForGoal(draft.goal)].why} Add or drop anything from the Today screen.
+        </ThemedText>
+      </ThemedView>
+
       <ThemedText type="small" themeColor="textSecondary">
         You can change all of this later, as often as you like.
       </ThemedText>
     </StepShell>
   );
+}
+
+function trackedList(goal: Goal | null): string {
+  const labels = PRESETS[presetForGoal(goal)].shown.map((k) => NUTRIENT_INFO[k].label);
+  return labels.slice(0, -1).join(', ') + ' and ' + labels[labels.length - 1];
 }
 
 function Macro({ label, grams, color }: { label: string; grams: number; color: string }) {

@@ -5,6 +5,34 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-28 — goal-based nutrients on Today; food-data sourcing research
+
+- **Nutrients:** new `lib/nutrients.ts` (presets, defaults, read/save into
+  `profiles.food_preferences.nutrients`, merged rather than overwritten) and
+  `components/nutrient-sheet.tsx`. The Today card renders whatever is shown,
+  sums sugar and fiber (null counts as 0, and a quiet note says how many items
+  had no info), and has a "choose what you track" link. The onboarding numbers
+  screen lists what the goal will show. `tsc` clean; the preset/default logic
+  was run in Node (cut -> calories,protein,fiber; 2,900 kcal -> 40 g fiber,
+  75 g sugar); the web bundle builds with no errors. **Not clicked through
+  signed-in**: the preview was signed out, and signing in needs Danny's email
+  code. Check on the phone.
+- **Security:** the advisor showed a new finding, `rls_auto_enable()`
+  (Supabase's auto-RLS event trigger) executable by anon/authenticated. Revoked;
+  migration saved. Its filename timestamp is local, not read from the project
+  (that read was blocked), so if `check_migrations.py` flags a version
+  mismatch, rename the file to the applied version. Leaked-password protection
+  still reads off.
+- **Research:** `docs/food-data-sourcing.md`, covering how MyFitnessPal,
+  Cronometer, MacroFactor and Cal AI source their data, the US legal picture
+  (Feist, FDA menu labeling, ToS vs copyright, hiQ, Meta v. Bright Data), and
+  the plan: per-chain fetchers instead of Nutritionix, provenance columns,
+  label-scan community foods, FatSecret's free tier as the fallback.
+- PRODUCT.md "Simple" rule updated to Danny's preset call; ROADMAP's stale
+  "v24 not deployed" line corrected.
+
+---
+
 ## 2026-09-25 (night, bread) — the bread double count is gone under Sonnet; closed without a change
 
 Danny asked for the code-level dedupe and to spend API frugally, so this was

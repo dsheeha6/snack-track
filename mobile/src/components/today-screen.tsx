@@ -6,6 +6,7 @@ import { AddEntryModal } from '@/components/add-entry-modal';
 import { DateStepper } from '@/components/date-stepper';
 import { EntryRow } from '@/components/entry-row';
 import { MacroBar } from '@/components/macro-bar';
+import { NutrientSheet } from '@/components/nutrient-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WaterCard } from '@/components/water-card';
@@ -14,7 +15,17 @@ import { useAuth } from '@/lib/auth-context';
 import { biometricLabel } from '@/lib/biometrics';
 import { addEntries, addEntry, deleteEntry, fetchEntries, type Entry, type NewEntry } from '@/lib/entries';
 import { dayLabel, guessMealSlot, localDateString, MEAL_COLORS, MEAL_LABELS, MEAL_SLOTS, type MealSlot } from '@/lib/meals';
+import {
+  fiberTargetFor,
+  NUTRIENT_INFO,
+  readNutrientPrefs,
+  saveNutrientPrefs,
+  sugarTargetFor,
+  type NutrientKey,
+  type NutrientPrefs,
+} from '@/lib/nutrients';
 import { supabase } from '@/lib/supabase';
+import type { Goal } from '@/lib/targets';
 import {
   addWater,
   deleteWater,
@@ -31,23 +42,52 @@ type Profile = {
   target_carbs: number;
   target_fat: number;
   target_water_oz: number;
+  goal: Goal | null;
+  food_preferences: unknown;
 };
 
-type Totals = { calories: number; protein: number; carbs: number; fat: number };
+type Totals = Record<NutrientKey, number>;
 
-const EMPTY_TOTALS: Totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+const EMPTY_TOTALS: Totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 };
 
-function sumEntries(entries: Entry[]): Totals {
+// Sugar/fiber are null on manual rows and on anything logged before
+// 2026-09-25; they count as 0 here, and `missing` says how many rows that was
+// so the card can say so rather than quietly under-reporting.
+function sumEntries(entries: Entry[]): Totals & { missingFiber: number; missingSugar: number } {
   return entries.reduce(
     (acc, e) => ({
       calories: acc.calories + Number(e.calories),
       protein: acc.protein + Number(e.protein),
       carbs: acc.carbs + Number(e.carbs),
       fat: acc.fat + Number(e.fat),
+      fiber: acc.fiber + Number(e.fiber ?? 0),
+      sugar: acc.sugar + Number(e.sugar ?? 0),
+      missingFiber: acc.missingFiber + (e.fiber == null ? 1 : 0),
+      missingSugar: acc.missingSugar + (e.sugar == null ? 1 : 0),
     }),
-    EMPTY_TOTALS
+    { ...EMPTY_TOTALS, missingFiber: 0, missingSugar: 0 }
   );
 }
+
+// Only mentioned when the nutrient is on screen and something was actually
+// missing it — plain information, nothing for the user to fix.
+function missingNote(shown: NutrientKey[], missingFiber: number, missingSugar: number): string | null {
+  const names = [
+    shown.includes('fiber') && missingFiber > 0 ? 'fiber' : null,
+    shown.includes('sugar') && missingSugar > 0 ? 'sugar' : null,
+  ].filter(Boolean);
+  if (names.length === 0) return null;
+  const n = Math.max(shown.includes('fiber') ? missingFiber : 0, shown.includes('sugar') ? missingSugar : 0);
+  return `${n} ${n === 1 ? 'item has' : 'items have'} no ${names.join(' or ')} info, so ${names.length === 1 ? 'that total' : 'those totals'} may read a little low.`;
+}
+
+const BAR_COLORS: Partial<Record<NutrientKey, string>> = {
+  protein: Brand.coral,
+  carbs: Brand.yellow,
+  fat: Brand.teal,
+  fiber: Brand.green,
+  sugar: Brand.pink,
+};
 
 export function TodayScreen() {
   const { session, signOut, biometricKind, biometricEnabled, setBiometricEnabled } = useAuth();
@@ -56,6 +96,10 @@ export function TodayScreen() {
   const [water, setWater] = useState<WaterEntry[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [modalMeal, setModalMeal] = useState<MealSlot | null>(null);
+  const [nutrientSheetKey, setNutrientSheetKey] = useState(0);
+  const [nutrientSheetOpen, setNutrientSheetOpen] = useState(false);
+  const [nutrientSaving, setNutrientSaving] = useState(false);
+  const [nutrientError, setNutrientError] = useState<string | null>(null);
 
   // null means "follow today", so leaving the app open past midnight still
   // rolls over to the new day. Only a day the user stepped back to is pinned.
@@ -80,7 +124,7 @@ export function TodayScreen() {
     let cancelled = false;
     supabase
       .from('profiles')
-      .select('target_calories, target_protein, target_carbs, target_fat, target_water_oz')
+      .select('target_calories, target_protein, target_carbs, target_fat, target_water_oz, goal, food_preferences')
       .single()
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -100,6 +144,48 @@ export function TodayScreen() {
   const totals = sumEntries(entries);
   const waterOunces = sumOunces(water);
   const waterTarget = Number(profile?.target_water_oz ?? DEFAULT_TARGET_OUNCES);
+
+  const nutrientPrefs = profile ? readNutrientPrefs(profile.food_preferences, profile.goal) : null;
+
+  const targetFor = (k: NutrientKey, p: Profile, prefs: NutrientPrefs): number => {
+    switch (k) {
+      case 'calories':
+        return p.target_calories;
+      case 'protein':
+        return p.target_protein;
+      case 'carbs':
+        return p.target_carbs;
+      case 'fat':
+        return p.target_fat;
+      case 'fiber':
+        return fiberTargetFor(prefs, p.target_calories);
+      case 'sugar':
+        return sugarTargetFor(prefs, p.target_calories);
+    }
+  };
+
+  const openNutrientSheet = () => {
+    setNutrientSheetKey((k) => k + 1);
+    setNutrientError(null);
+    setNutrientSheetOpen(true);
+  };
+
+  // Not optimistic: the sheet stays open with its own error if the save fails,
+  // so nothing the user just chose is lost.
+  const handleSaveNutrients = async (prefs: NutrientPrefs) => {
+    if (!profile) return;
+    setNutrientSaving(true);
+    setNutrientError(null);
+    try {
+      const saved = await saveNutrientPrefs(prefs, profile.food_preferences);
+      setProfile((p) => (p ? { ...p, food_preferences: saved } : p));
+      setNutrientSheetOpen(false);
+    } catch (e) {
+      setNutrientError(e instanceof Error ? e.message : 'Could not save what you track.');
+    } finally {
+      setNutrientSaving(false);
+    }
+  };
 
   const handleSave = async (entry: NewEntry) => {
     const saved = await addEntry(entry);
@@ -200,25 +286,27 @@ export function TodayScreen() {
 
           {loadError && <ThemedText style={styles.error}>{loadError}</ThemedText>}
 
-          {profile ? (
+          {profile && nutrientPrefs ? (
             <>
               <ThemedView type="backgroundElement" style={styles.card}>
-                <MacroBar label="calories" current={totals.calories} target={profile.target_calories} unit="" />
-                <MacroBar
-                  label="protein"
-                  current={totals.protein}
-                  target={profile.target_protein}
-                  unit="g"
-                  color={Brand.coral}
-                />
-                <MacroBar
-                  label="carbs"
-                  current={totals.carbs}
-                  target={profile.target_carbs}
-                  unit="g"
-                  color={Brand.yellow}
-                />
-                <MacroBar label="fat" current={totals.fat} target={profile.target_fat} unit="g" color={Brand.teal} />
+                {nutrientPrefs.shown.map((k) => (
+                  <MacroBar
+                    key={k}
+                    label={NUTRIENT_INFO[k].label}
+                    current={totals[k]}
+                    target={targetFor(k, profile, nutrientPrefs)}
+                    unit={NUTRIENT_INFO[k].unit}
+                    color={BAR_COLORS[k]}
+                  />
+                ))}
+                {missingNote(nutrientPrefs.shown, totals.missingFiber, totals.missingSugar) && (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {missingNote(nutrientPrefs.shown, totals.missingFiber, totals.missingSugar)}
+                  </ThemedText>
+                )}
+                <Pressable onPress={openNutrientSheet} hitSlop={8} style={styles.customize}>
+                  <ThemedText type="linkPrimary">choose what you track</ThemedText>
+                </Pressable>
               </ThemedView>
 
               <WaterCard
@@ -285,6 +373,20 @@ export function TodayScreen() {
         onSave={handleSave}
         onSaveMany={handleSaveMany}
       />
+
+      {profile && nutrientPrefs && (
+        <NutrientSheet
+          key={nutrientSheetKey}
+          visible={nutrientSheetOpen}
+          prefs={nutrientPrefs}
+          goal={profile.goal}
+          calorieTarget={profile.target_calories}
+          saving={nutrientSaving}
+          error={nutrientError}
+          onClose={() => setNutrientSheetOpen(false)}
+          onSave={handleSaveNutrients}
+        />
+      )}
     </ThemedView>
   );
 }
@@ -326,6 +428,10 @@ const styles = StyleSheet.create({
   },
   error: {
     color: Brand.coral,
+  },
+  customize: {
+    alignSelf: 'flex-start',
+    marginTop: Spacing.one,
   },
   signOut: {
     alignItems: 'center',
