@@ -29,34 +29,16 @@ label scanning. FatSecret's free tier is the legal fallback for the long tail.
 **Left for you:** OK to start the per-chain rewrite (it's the next data job
 after accuracy), and a one-hour lawyer consult before Phase 8.
 
-### One dashboard toggle: leaked-password protection (30 seconds, yours to click)
-The Supabase security advisor is clean except for this one, and it's been there
-since email+password sign-in went in: **Authentication → Policies → "Leaked
-password protection"** is off. On, it checks a new password against
-HaveIBeenPwned so nobody signs up with a password that's already in a breach
-dump. No code, no migration, no downside — it only ever rejects passwords that
-are already public.
-
-Not urgent while the only accounts are yours and mine, genuinely worth having
-before anyone else installs it (Phase 8).
-
-**Update 2026-09-20:** this is now the *only* security advisor finding and the
-last open item in Tier 0 of the backend-first plan (ROADMAP → Backend first).
-Everything else in that tier is done and verified. Flip this and the backend is
-clean.
-
-**Danny (2026-09-28):** turning it on. **Still reported off by the advisor at
-02:14 UTC 09-29**, so check the toggle actually saved (it sits behind a Save
-button, and on some plans it needs Pro; if the switch is greyed out, that's why,
-and it can wait for launch). A new advisor finding the same night,
-`rls_auto_enable()` exposed over RPC, was Supabase's own event trigger and is
-fixed (migration `revoke_rls_auto_enable_execute`).
-
-**Danny:**
-
 ---
 
 ## ANSWERED
+
+### Leaked-password protection — Pro plan only (2026-09-28)
+Danny couldn't find the toggle; Supabase's docs say it's "available on the Pro
+Plan and above". Nothing to do on the free tier. It goes on with the Pro
+upgrade at launch (Phase 8), which launch needs anyway, since free projects
+auto-pause after a week idle. The only other advisor finding
+(`rls_auto_enable()`) is fixed.
 
 ### Goal-based nutrient tracking — built 2026-09-28
 Danny: presets per goal (cut, bulk, recomp, maintain) showing what matters for

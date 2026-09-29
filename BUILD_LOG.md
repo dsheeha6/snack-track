@@ -5,6 +5,40 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-09-28 (later) — chain rewrite started: 6 of 57 off Nutritionix
+
+Danny: do the chain rewrite first, then portion accuracy; blanket OK to
+download chains' own nutrition PDFs.
+
+- **Official now:** Arby's, Dunkin', El Pollo Loco (commit 15f533a), P.F.
+  Chang's, Denny's, Outback (8b2b509). 2,118 rows loaded, each with the
+  chain's `source_url` and `fetched_on`. Where official and Nutritionix
+  disagree, the guide is the newer one: Nutritionix still lists retired
+  items (Arby's burgers, El Pollo Loco's Pollo Fit bowls), had Dunkin's
+  small/medium macchiato swapped, and its El Pollo Loco drinks were about
+  half the guide's no-ice figures.
+- **Tooling:** `common.pdf_rows()` handles wrapped names, wrapped number
+  runs, thousands separators, footnote marks and optional trailing columns.
+  `pdf_guides.py` is table-driven for one-row-per-item guides. `compare.py`
+  and `exact.py` check a fetch against the rows it replaces (old rows from
+  git). `SOURCES.md` tracks all 57.
+- **Live check:** parse-meal on three meals picked the new rows (Dunkin'
+  latte + bagel sandwich 810, Arby's beef 'n cheddar + medium curly fries
+  once the page-first-row bug was fixed, El Pollo Loco bowl + horchata).
+- **Held:** Cheesecake Factory parses (413/445 agree) but has big gaps
+  (meatloaf 1,930 vs 1,400) to check first. **Blocked:** Taco Bell publishes
+  only calories; its own calculator *is* Nutritionix. Burger King and the
+  other RBI chains are app-only (the menu needs a store selected).
+- **Downloaded, not parsed yet:** Olive Garden, Buffalo Wild Wings,
+  Tropical Smoothie, Bojangles (Feb 2025) guides in `data/restaurants/raw/`.
+- **Trap:** writing Python through a bash heredoc turned `` into a
+  literal backspace twice (a regex silently stopped matching). Edit these
+  scripts with the editor, not heredocs.
+- Leaked-password protection is **Pro plan only** (Supabase docs), which is
+  why Danny couldn't find it. Parked with launch, which needs Pro anyway.
+
+---
+
 ## 2026-09-28 — goal-based nutrients on Today; food-data sourcing research
 
 - **Nutrients:** new `lib/nutrients.ts` (presets, defaults, read/save into
