@@ -24,7 +24,7 @@ Official already: chipotle, mcdonalds, chick-fil-a, sweetgreen, cava.
 | raising-canes | Raising Cane's |  | nutritionix |
 | wingstop | Wingstop |  | nutritionix |
 | zaxbys | Zaxby's |  | nutritionix |
-| bojangles | Bojangles |  | nutritionix |
+| bojangles | Bojangles | Nutrition guide PDF (Feb 2025), bojangles.com | todo: two-column page; check it is current |
 | sonic | Sonic |  | nutritionix |
 | arbys | Arby's | Nutritional & Allergen PDF, arbys.com/nutrition (Sept 2026) | **official** 2026-09-28: 123 rows; 94/101 matched agree, rest are Nutritionix's retired sizes/items |
 | jack-in-the-box | Jack in the Box |  | nutritionix |
@@ -50,19 +50,19 @@ Official already: chipotle, mcdonalds, chick-fil-a, sweetgreen, cava.
 | dairy-queen | Dairy Queen |  | nutritionix |
 | krispy-kreme | Krispy Kreme |  | nutritionix |
 | tim-hortons | Tim Hortons | same platform as BK (RBI) | nutritionix |
-| tropical-smoothie-cafe | Tropical Smoothie Cafe |  | nutritionix |
+| tropical-smoothie-cafe | Tropical Smoothie Cafe | Nutrition guide PDF, tropicalsmoothiecafe.com | todo: allergen codes precede the numbers |
 | smoothie-king | Smoothie King |  | nutritionix |
-| olive-garden | Olive Garden |  | nutritionix |
+| olive-garden | Olive Garden | Nutrition PDF, media.olivegarden.com (downloaded 2026-09-28) | todo: names and numbers on separate lines |
 | applebees | Applebee's |  | nutritionix |
 | chilis | Chili's |  | nutritionix |
-| cheesecake-factory | The Cheesecake Factory |  | nutritionix |
+| cheesecake-factory | The Cheesecake Factory | Nutrition PDF served at thecheesecakefactory.com/nutrition | hold: 413/445 agree but some big gaps (meatloaf 1930 vs 1400, fries 530 vs 1060); check before switching |
 | texas-roadhouse | Texas Roadhouse |  | nutritionix |
-| outback-steakhouse | Outback Steakhouse |  | nutritionix |
+| outback-steakhouse | Outback Steakhouse | Full nutrition PDF, outback.com (2026) | **official** 2026-09-28: 487 rows; 186/262 exact matches agree, the rest look like recipe changes (guide is current) |
 | red-robin | Red Robin |  | nutritionix |
-| buffalo-wild-wings | Buffalo Wild Wings |  | nutritionix |
+| buffalo-wild-wings | Buffalo Wild Wings | Nutrition Guide PDF 08-18 to 11-17-2026, buffalowildwings.com | todo: sauces/wings in several layouts |
 | ihop | IHOP |  | nutritionix |
-| dennys | Denny's |  | nutritionix |
+| dennys | Denny's | Core + LTO nutrition PDFs, dennys.com (May 2026) | **official** 2026-09-28: 223 rows; 41/43 exact-name matches agree |
 | cracker-barrel | Cracker Barrel |  | nutritionix |
-| pf-changs | P.F. Chang's |  | nutritionix |
+| pf-changs | P.F. Chang's | Nutrition PDF, pfchangs.com (autumn 2026 menu) | **official** 2026-09-28: 199 rows; 41/41 exact-name matches agree (Nutritionix split shareables into per-person rows) |
 | wawa | Wawa |  | nutritionix |
 | sheetz | Sheetz |  | nutritionix |

@@ -49,7 +49,7 @@ CHAINS = {
 # Chains now fetched from their own published numbers (see SOURCES.md). They stay
 # in CHAINS so an explicit `python nutritionix_chains.py dunkin` can still pull
 # a comparison copy, but a no-argument run must never overwrite them.
-REPLACED = {"arbys", "dunkin", "el-pollo-loco"}
+REPLACED = {"arbys", "dunkin", "el-pollo-loco", "pf-changs", "dennys", "outback-steakhouse"}
 
 
 def main():

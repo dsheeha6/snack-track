@@ -125,17 +125,21 @@ def write(slug, rows):
 NUMTOK = r"(<\s?\d+(?:\.\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|-)"
 
 
-def pdf_rows(path, ncols, *, is_header=None, on_header=None, trailing_junk=r"(\s+X)+\s*$"):
+def pdf_rows(path, ncols, *, is_header=None, on_header=None, trailing_junk=r"(\s+X)+\s*$",
+             optional_tail=0):
     """Yield (text_before_numbers, [ncols numbers], preceding_text_lines) from a
     nutrition-guide PDF where each item is its name followed by exactly `ncols`
     numbers. Names that wrap onto several lines are joined back up: lines that
     don't end in the numbers are held and prefixed to the next row. The held
     lines are also passed out, so a fetcher can read section headings from them.
     `is_header(line)` marks column-header lines, which clear the held text;
-    `on_header(held)` sees that text first (usually the section heading)."""
+    `on_header(held)` sees that text first (usually the section heading).
+    `optional_tail` allows that many extra numbers after the columns, dropped
+    (Cheesecake Factory adds per-person calories to shareable plates)."""
     from pypdf import PdfReader
 
-    row_re = re.compile(r"^(.*?)\s*" + r"\s+".join([NUMTOK] * ncols) + r"$")
+    tail = rf"(?:\s+\d+(?:\.\d+)?){{0,{optional_tail}}}" if optional_tail else ""
+    row_re = re.compile(r"^(.*?)\s*" + r"\s+".join([NUMTOK] * ncols) + tail + r"$")
     held = []
     for page in PdfReader(path).pages:
         for line in (page.extract_text() or "").splitlines():
