@@ -5,6 +5,49 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-10-30 — chain rewrite: 10 of 57 off Nutritionix
+
+The four guides downloaded last run are parsed, checked and loaded: Olive
+Garden, Buffalo Wild Wings, Bojangles, Tropical Smoothie Cafe (1,609 rows).
+SOURCES.md has each one's agreement numbers.
+
+- **Olive Garden** (`olive_garden.py`): pypdf's plain text lists every number
+  row, then every name, in a different order, so rows are paired by text
+  position instead. The name column runs one item ahead across page breaks
+  (a page's last name belongs to the next page's top row). Lunch, lighter,
+  kids, gluten-sensitive, catering and to-go repeat dinner dishes, so `size`
+  keeps them apart; before that, dedupe was silently collapsing lunch into
+  dinner. The guide is newer: Alfredos ~80 kcal lower, lunch Fettuccine
+  Alfredo 650 -> 920 (self-consistent on 4/4/9; the other 7 lunch rows
+  Nutritionix also had match exactly).
+- **Buffalo Wild Wings** (`buffalo_wild_wings.py`): 1,050 rows vs
+  Nutritionix's 313. Each wing count is followed by every sauce at that
+  count's amount. **Live check caught a real bug:** "10 boneless honey bbq"
+  logged as the 140 kcal sauce row and the 610 kcal of wings vanished. Fixed
+  by writing wings + sauce as one dish per count ("Boneless Wings with Honey
+  BBQ", 10 count, 750). "a / b" rows split into regular/large, 3/5-count
+  dippers, or "with bacon / with sausage"; party-menu and sampler rows are
+  sized so a plain "potato wedges" can't hit the 2,240 kcal pan. Range rows
+  (Saucy Chicken Sandwich, 570-840) are skipped. **Guide expires 11-17-2026.**
+- **Bojangles** (`pdf_guides.py`): new per-guide options (serving pattern,
+  heading pattern, allergen marks, oz-in-name, category size). 139/141
+  matched agree.
+- **Tropical Smoothie** (`tropical_smoothie_cafe.py`): food is 11 columns,
+  smoothies 15 with Splenda variants, each written as a second row. Named
+  "X Smoothie" as people say it.
+- `common.pdf_rows` now reads ".5" as 0.5. Re-ran every shipped PDF chain
+  against HEAD ignoring `fetched_on`: numbers identical; P.F. Chang's only
+  gained a category spelling fix ("Chef'S" -> "Chef's"), reloaded.
+- **Live check** through deployed parse-meal, all from official rows: BWW 10
+  boneless Honey BBQ + regular fries 1,120; OG lunch Alfredo + breadstick
+  1,060; OG Chicken Parm 1,020; Bojangles breast, leg, individual pintos,
+  large sweet tea 1,210; Tropical Smoothie Mango Magic + Chicken Pesto
+  Flatbread 940.
+- Not touched: the P.F. Chang's row whose name still starts with its heading
+  ("NOODLES & RICE CHEF'S FEAST Pad Thai"), pre-existing.
+
+---
+
 ## 2026-09-28 (later) — chain rewrite started: 6 of 57 off Nutritionix
 
 Danny: do the chain rewrite first, then portion accuracy; blanket OK to

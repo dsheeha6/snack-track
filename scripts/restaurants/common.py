@@ -147,6 +147,7 @@ def pdf_rows(path, ncols, *, is_header=None, on_header=None, trailing_junk=r"(\s
             if trailing_junk:
                 line = re.sub(trailing_junk, "", line).strip()
             line = re.sub(r"(?<=\d)\+(?=\s|$)", "", line)  # "0+" (a footnoted zero)
+            line = re.sub(r"(?<![\d.])\.(\d)", r"0.\1", line)  # ".5" (Bojangles) -> "0.5"
             if not line:
                 continue
             if is_header and is_header(line):

@@ -7,6 +7,12 @@ Until then its Nutritionix rows stay loaded, so nothing goes missing.
 
 Official already: chipotle, mcdonalds, chick-fil-a, sweetgreen, cava.
 
+**Wing-chain trap (2026-10-30):** a sauce listed per wing count must never be
+loaded as a row of its own. The parser read "10 boneless honey bbq" as the
+140 kcal sauce row and dropped the 610 kcal of wings. `buffalo_wild_wings.py`
+writes wings + sauce as one dish per count; Wingstop and Zaxby's will need the
+same when they move.
+
 | slug | chain | official source | status |
 |---|---|---|---|
 | taco-bell | Taco Bell | tacobell.com shows calories only; its own "nutrition calculator" link IS Nutritionix | blocked: needs a Nutritionix license, FatSecret, or a written request to Taco Bell |
@@ -24,7 +30,7 @@ Official already: chipotle, mcdonalds, chick-fil-a, sweetgreen, cava.
 | raising-canes | Raising Cane's |  | nutritionix |
 | wingstop | Wingstop |  | nutritionix |
 | zaxbys | Zaxby's |  | nutritionix |
-| bojangles | Bojangles | Nutrition guide PDF (Feb 2025), bojangles.com | todo: two-column page; check it is current |
+| bojangles | Bojangles | Nutrition wall-sign PDF (2025), bojangles.com | **official** 2026-10-30: 148 rows; 139/141 matched agree. The guide lists Garden Salad twice (170 and 260); the first is kept. Still the newest file the site links |
 | sonic | Sonic |  | nutritionix |
 | arbys | Arby's | Nutritional & Allergen PDF, arbys.com/nutrition (Sept 2026) | **official** 2026-09-28: 123 rows; 94/101 matched agree, rest are Nutritionix's retired sizes/items |
 | jack-in-the-box | Jack in the Box |  | nutritionix |
@@ -50,16 +56,16 @@ Official already: chipotle, mcdonalds, chick-fil-a, sweetgreen, cava.
 | dairy-queen | Dairy Queen |  | nutritionix |
 | krispy-kreme | Krispy Kreme |  | nutritionix |
 | tim-hortons | Tim Hortons | same platform as BK (RBI) | nutritionix |
-| tropical-smoothie-cafe | Tropical Smoothie Cafe | Nutrition guide PDF, tropicalsmoothiecafe.com | todo: allergen codes precede the numbers |
+| tropical-smoothie-cafe | Tropical Smoothie Cafe | Health & Nutrition Guide PDF, tropicalsmoothiecafe.com (05/14/26) | **official** 2026-10-30: 123 rows incl. a "made with Splenda" row per smoothie; 41/60 exact names agree, the rest are recipe changes (Mocha Madness 620 -> 810). LTO Javablender page not read |
 | smoothie-king | Smoothie King |  | nutritionix |
-| olive-garden | Olive Garden | Nutrition PDF, media.olivegarden.com (downloaded 2026-09-28) | todo: names and numbers on separate lines |
+| olive-garden | Olive Garden | Nutrition PDF, media.olivegarden.com (US_083126) | **official** 2026-10-30: 288 rows, read by text position; lunch/lighter/kids/catering kept apart in `size`. 96/102 exact names agree; Alfredos ~80 lower, lunch Fettuccine Alfredo 650 -> 920 |
 | applebees | Applebee's |  | nutritionix |
 | chilis | Chili's |  | nutritionix |
 | cheesecake-factory | The Cheesecake Factory | Nutrition PDF served at thecheesecakefactory.com/nutrition | hold: 413/445 agree but some big gaps (meatloaf 1930 vs 1400, fries 530 vs 1060); check before switching |
 | texas-roadhouse | Texas Roadhouse |  | nutritionix |
 | outback-steakhouse | Outback Steakhouse | Full nutrition PDF, outback.com (2026) | **official** 2026-09-28: 487 rows; 186/262 exact matches agree, the rest look like recipe changes (guide is current) |
 | red-robin | Red Robin |  | nutritionix |
-| buffalo-wild-wings | Buffalo Wild Wings | Nutrition Guide PDF 08-18 to 11-17-2026, buffalowildwings.com | todo: sauces/wings in several layouts |
+| buffalo-wild-wings | Buffalo Wild Wings | Nutrition Guide PDF 08-18 to 11-17-2026, buffalowildwings.com | **official** 2026-10-30: 1,050 rows (Nutritionix had 313); wings x sauce written as combined dishes per count. 86/97 exact names agree. **Guide expires 11-17-2026: re-download then** |
 | ihop | IHOP |  | nutritionix |
 | dennys | Denny's | Core + LTO nutrition PDFs, dennys.com (May 2026) | **official** 2026-09-28: 223 rows; 41/43 exact-name matches agree |
 | cracker-barrel | Cracker Barrel |  | nutritionix |

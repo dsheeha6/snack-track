@@ -56,6 +56,24 @@ GUIDES = {
         "skip": re.compile(r"\((?:[A-Z]{2}|SUB)\)\s*$"),
         "optional_tail": 1,
     },
+    "bojangles": {
+        # A one-page wall sign, "BOJ-NutritionWallSign-11x17-Pepsi-2025", the
+        # newest bojangles.com links to (checked 2026-10-30).
+        "chain": "Bojangles",
+        "file": "bojangles_nutrition_*.pdf",
+        "url": "https://www.bojangles.com/nutrition",
+        "cols": ("calories", "cal_fat", "fat", "sat_fat", "trans_fat", "chol", "carbs",
+                 "sodium_mg", "sugar", "protein", "fiber"),
+        "serving": re.compile(r"\s+((?:\d+(?:\.\d+|/\d+)?\s*(?:pc|oz|Gal|Bowl)|\d+|Ind\.|Picnic|Sm|Small|"
+                              r"Medium|Regular|Large))$", re.I),
+        "size_words": {"ind.": "individual", "sm": "small", "1": ""},
+        "oz_in_name": True,
+        # Allergen columns: an "x" (sometimes "X") per allergen after the numbers.
+        "trailing_junk": r"(\s+[xX])+\s*$",
+        # "SALADS Not included: ...", "KIDS' MEAL w/water, green beans, biscuit"
+        "heading": re.compile(r"^([A-Z][A-Z'’ ]{3,}?)(?:\s+[A-Z]?[a-z/].*)?$"),
+        "category_size": {"Kids' Meal": "kids' meal"},
+    },
 }
 
 # A heading is an all-caps line (letters, spaces, &, ', -), e.g. "ALL DA Y BRUNCH COCKTAILS".
@@ -68,12 +86,26 @@ def fetch(slug):
     if not files:
         raise SystemExit(f"{slug}: no {g['file']} in {RAW}")
     out = []
+    heading = g.get("heading", HEADING)
+    extra = {"trailing_junk": g["trailing_junk"]} if "trailing_junk" in g else {}
     for path in files:
         category = ""
-        for name, nums, held in pdf_rows(path, len(g["cols"]), optional_tail=g.get("optional_tail", 0)):
-            for h in held:
-                if HEADING.match(h) and len(h) < 60:
-                    category = re.sub(r"\s+", " ", h).title()
+        for name, nums, held in pdf_rows(path, len(g["cols"]), optional_tail=g.get("optional_tail", 0),
+                                         **extra):
+            last = -1
+            for i, h in enumerate(held):
+                m = heading.match(h)
+                if m and len(h) < (80 if "heading" in g else 60):
+                    category = re.sub(r"\s+", " ", m.group(m.lastindex or 0)).strip().title()
+                    category = category.replace("’", "'").replace("'S", "'s")
+                    last = i
+            if "heading" in g and last >= 0:
+                # The heading (and the column header above it) was held and
+                # glued onto the front of this row's name; only lines after it
+                # can be the start of a wrapped name.
+                prefix = " ".join(held[:last + 1])
+                if name.startswith(prefix):
+                    name = name[len(prefix):].strip()
             if g.get("single_line") and held:
                 # Every row fits on one line, so anything held above it is a
                 # section heading ("Aussie-Tizers"), not the start of a name.
@@ -89,10 +121,20 @@ def fetch(slug):
                 continue
             size = ""
             if g.get("serving"):
-                m = SERVING.search(name)
+                pattern = g["serving"] if isinstance(g["serving"], re.Pattern) else SERVING
+                m = pattern.search(name)
                 if m:
                     size, name = m.group(1), name[:m.start()]
+                    size = g.get("size_words", {}).get(size.lower(), size)
             name = name.strip(" *'")
+            if g.get("oz_in_name"):
+                # "Pepsi (22oz) * Regular" -> name "Pepsi", size "Regular (22 oz)"
+                m = re.search(r"\s*\((\d+(?:\.\d+)?)\s*oz\)", name)
+                if m:
+                    size = f"{size} ({m.group(1)} oz)".strip()
+                    name = (name[:m.start()] + name[m.end():]).strip(" *")
+            if category in g.get("category_size", {}):
+                size = ", ".join(filter(None, [g["category_size"][category], size]))
             if not name or len(name) > 90:
                 continue
             v = dict(zip(g["cols"], nums))
