@@ -29,6 +29,12 @@ label scanning. FatSecret's free tier is the legal fallback for the long tail.
 **Left for you:** OK to start the per-chain rewrite (it's the next data job
 after accuracy), and a one-hour lawyer consult before Phase 8.
 
+**Danny (2026-11-01):** he's researching the chain data himself and will come
+back with an answer.
+
+**Danny (2026-11-02):** keep going with the per-chain rewrite for now. He'll
+reach out to a lawyer before the full launch. Still open only for that consult.
+
 ---
 
 ## ANSWERED

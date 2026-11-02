@@ -5,6 +5,34 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-11-02 — chain rewrite: 13 of 57 off Nutritionix
+
+Danny: keep going with the per-chain rewrite; he'll talk to a lawyer before the
+full launch. Five Guys (41 rows), Del Taco (166), Shake Shack (275) now come from
+their own PDFs and are loaded. No Nutritionix URLs remain on those rows.
+
+- **Caught by the live check, after loading:** Shake Shack's spirit ranges parsed
+  as a name ending "100-" with 150 calories, and one row had a blank name. Fixed,
+  reloaded, and confirmed against the live table (no blanks, no spirits).
+- **Also from the live check:** "regular fries" at Five Guys picked the Cajun row
+  when the plain one was named "Five Guys Style Fries". Now "Fries" / "Cajun Fries".
+- **Guide misprints handled:** Five Guys Hot Dog (Supplier K) 460 g carbs (dropped,
+  Supplier H kept); Little Cajun fat 28 -> 23 (matches its 204 kcal from fat); Shake
+  Shack Add Grilled Chicken's shifted columns; Chopped Cheese Loaded Fries' 147 g
+  carbs on 910 kcal (dropped, the model estimates it).
+- **Live check** through deployed parse-meal, all from official rows: ShackBurger +
+  regular fries 970; Double SmokeShack + large lemonade 1,130; 6 bites + vanilla
+  shake 1,030; 2 The Del Tacos + regular fries 920; Epic Grilled Chicken Loaded Queso
+  + large Coke 1,230.
+- **Open, not fixed:** Five Guys has no burger rows, so the model builds one.
+  "five guys cheeseburger" came back 1,147: two patties, bun and two cheese is 984,
+  so about 163 is toppings it chose. And Hamburger Patty prints 302 kcal where its
+  own macros give 217 (65 g), which Nutritionix copied too. Left as published. If
+  302 is wrong, every Five Guys burger is about 170 kcal high.
+- Blocked and no-PDF sites are listed in SOURCES.md. 403s were left alone.
+
+---
+
 ## 2026-11-01 — prototype retired, archived in `reference/prototype/`
 
 Danny's call. `../calorie-tracker` is gone; `index.html` (style reference),

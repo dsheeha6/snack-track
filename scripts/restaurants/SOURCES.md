@@ -13,6 +13,20 @@ loaded as a row of its own. The parser read "10 boneless honey bbq" as the
 writes wings + sauce as one dish per count; Wingstop and Zaxby's will need the
 same when they move.
 
+**Range trap (2026-11-02):** a calorie range like "100-150" can parse as a name
+ending "100-" and 150 calories, because the row pattern allows no space before
+the first number. Shake Shack's spirits loaded that way once. Reject names that
+end in `-` or `/` after a digit.
+
+**Blocked sites (probed 2026-11-02):** Panda Express, KFC, Raising Cane's,
+Zaxby's, Panera, Dairy Queen and Applebee's answer a script with 403. That is
+bot blocking, so don't work around it: look for a public PDF link instead, or
+leave the chain for licensing. Subway's page reset or timed out; its 2026 US
+allergen PDF exists, the nutrition one wasn't found. Wingstop, Culver's,
+Whataburger, Jimmy John's, Papa John's, Krispy Kreme, Chili's, Smoothie King,
+MOD, Blaze, McAlister's and Jason's Deli load but show no nutrition PDF in their
+HTML, so they probably need a look in a browser.
+
 | slug | chain | official source | status |
 |---|---|---|---|
 | taco-bell | Taco Bell | tacobell.com shows calories only; its own "nutrition calculator" link IS Nutritionix | blocked: needs a Nutritionix license, FatSecret, or a written request to Taco Bell |
@@ -22,9 +36,9 @@ same when they move.
 | starbucks | Starbucks | starbucks.com/menu (product pages) | nutritionix |
 | dunkin | Dunkin' | Nutrition Guide PDF, dunkindonuts.com (updated 2026-08-19) | **official** 2026-09-28: 974 rows; 748 exact-name matches, 9 differ (guide newer; Nutritionix had S/M macchiato swapped) |
 | panda-express | Panda Express |  | nutritionix |
-| five-guys | Five Guys |  | nutritionix |
-| shake-shack | Shake Shack |  | nutritionix |
-| in-n-out-burger | In-N-Out Burger |  | nutritionix |
+| five-guys | Five Guys | US Nutrition & Allergen PDF, fiveguys.com (chart dated 01-2024) | **official** 2026-11-02: 41 rows, components only; 32/32 matched agree. Hamburger Patty prints 302 kcal but its macros give 217, left as published: see BUILD_LOG |
+| shake-shack | Shake Shack | Nutrition & Allergen PDF, shakeshack.com/document/2451 (created 2026-08-10) | **official** 2026-11-02: 275 rows; 122/142 matched agree, the rest look like recipe changes (Avocado Bacon Single 610 -> 670). Spirits and combos are ranges and are not loaded |
+| in-n-out-burger | In-N-Out Burger | PDF at in-n-out.com/docs/default-source/downloads/nutrition_info.pdf; script fails certificate verification, not tried in a browser | todo |
 | popeyes | Popeyes | same platform as BK (RBI) | nutritionix |
 | kfc | KFC |  | nutritionix |
 | raising-canes | Raising Cane's |  | nutritionix |
@@ -38,7 +52,7 @@ same when they move.
 | whataburger | Whataburger |  | nutritionix |
 | carls-jr | Carl's Jr. |  | nutritionix |
 | hardees | Hardee's |  | nutritionix |
-| del-taco | Del Taco | PDF linked from deltaco.com/nutrition via script (path 404s when fetched directly) | todo |
+| del-taco | Del Taco | Nutritional List PDF, deltaco.com/files/pdf/2026/nutritional-09-2026.pdf (September 2026; the path carries the date, so read deltaco.com/nutrition.html for the next one) | **official** 2026-11-02: 166 rows (Nutritionix had 101); 47/59 matched agree, others look like recipe changes (Bean & Cheese Red 460 -> 520). Meal tables are ranges and are not loaded |
 | el-pollo-loco | El Pollo Loco | Nutrition Guide PDF, elpolloloco.com (May 2026) | **official** 2026-09-28: 118 rows; drinks are the guide's no-ice figures (size says "(no ice)"); Nutritionix's were ~half |
 | qdoba | Qdoba |  | nutritionix |
 | panera-bread | Panera Bread |  | nutritionix |

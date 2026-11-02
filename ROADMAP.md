@@ -579,9 +579,12 @@ the thing Danny says already works.
 
 ---
 
-## The design pass (not scheduled)
+## The design pass (before Phase 6)
 
-Also Danny's 2026-09-17 direction, also **not started by his call**. The app is
+**Scheduled by Danny 2026-11-01: this lands before the paywall.** The prototype's
+page is in `reference/prototype/` to work from.
+
+Also Danny's 2026-09-17 direction, **not started yet**. The app is
 currently a flat, tidy, template-shaped version of itself, and `PRODUCT.md` has
 always said that a flat rounded-rectangle version of this app is a *different
 product*. He's now given a much fuller reference set — Graza, the Australian
@@ -695,6 +698,8 @@ leaves that account, and a near-duplicate merges instead of creating a row.
 ## Phase 6 — Paywall
 
 **Goal:** it can take money.
+
+**Waits on the design pass** (Danny, 2026-11-01).
 
 - [ ] RevenueCat wired to App Store and Play products
 - [ ] Webhook → `subscriptions` table
