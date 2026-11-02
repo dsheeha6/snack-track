@@ -5,6 +5,18 @@ Nothing gets marked done here that wasn't actually run.
 
 ---
 
+## 2026-11-01 — prototype retired, archived in `reference/prototype/`
+
+Danny's call. `../calorie-tracker` is gone; `index.html` (style reference),
+`parse.py` (eval baseline), `suggest.py` (Phase 5), plus `server.py` and
+`data/log.json` so the page still opens, now live in `reference/prototype/`.
+`evals/run.py` points there: baseline report byte-identical before and after.
+`log.py`, `run.bat` and the old one-commit git history were not carried over.
+Phase 2's "done when" closed with this. The comment edit in `parse-meal/index.ts`
+was not redeployed; the live function differs only by that comment.
+
+---
+
 ## 2026-10-30 — chain rewrite: 10 of 57 off Nutritionix
 
 The four guides downloaded last run are parsed, checked and loaded: Olive

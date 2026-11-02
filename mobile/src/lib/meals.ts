@@ -11,8 +11,7 @@ export const MEAL_LABELS: Record<MealSlot, string> = {
   snacks: 'snacks',
 };
 
-// Matches ../calorie-tracker/index.html's meal palette so the two apps read
-// the same way while both exist.
+// Matches the meal palette in reference/prototype/index.html.
 export const MEAL_COLORS: Record<MealSlot, string> = {
   breakfast: Brand.yellow,
   lunch: Brand.lime,

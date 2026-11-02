@@ -15,7 +15,7 @@ Usage:
     python run.py --meals meals_hard.jsonl    # ...on the hard 20
     python run.py --json out.json             # also write full per-meal results
 
-The baseline pipeline is ../../calorie-tracker/parse.py, run with no logging
+The baseline pipeline is ../reference/prototype/parse.py, run with no logging
 history (an empty entries list), so its "history" shortcut never fires and
 every meal is scored on the ingredient-table/quantity-parsing logic alone.
 This is deliberate: history match would make the baseline look better than
@@ -41,7 +41,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent
-PROTOTYPE_DIR = REPO_ROOT.parent / "calorie-tracker"
+PROTOTYPE_DIR = REPO_ROOT / "reference" / "prototype"
 
 MACROS = ("calories", "protein", "carbs", "fat")
 
@@ -90,7 +90,7 @@ def load_meals(path):
 
 def run_baseline(meals):
     sys.path.insert(0, str(PROTOTYPE_DIR))
-    import parse as prototype_parse  # ../../calorie-tracker/parse.py
+    import parse as prototype_parse  # ../reference/prototype/parse.py
 
     results = []
     for meal in meals:

@@ -169,7 +169,7 @@ reads as a texture; a wobble that's different every time reads as a hand. And
 none of it is allowed to make a number harder to read — this is an app someone
 checks at a restaurant table.
 
-Taken from the working prototype (`../calorie-tracker/index.html`), which is the
+Taken from the prototype (`reference/prototype/index.html`), which is the
 reference implementation:
 
 | Token | Value | Used for |

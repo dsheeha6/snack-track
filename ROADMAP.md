@@ -20,9 +20,7 @@ load-bearing at Phase 8.
 
 Both sign-in bugs are closed (resend throttle fixed 2026-08-23; the
 session-restore one closed by Danny 2026-08-24, with two defensive fixes already
-in). One "done when" is still outstanding and it's a usage question, not a build
-one: Phase 2 closes when Danny goes a full day on the app instead of the
-prototype.
+in). Phase 2's last "done when" closed 2026-11-01, when Danny retired the prototype.
 
 **Read `PRODUCT.md` before any decision about features, copy, or design.** The app
 is simple, easy, and doesn't judge anyone. That's the differentiator, not a slogan —
@@ -53,7 +51,8 @@ activity as Phase 2's outstanding "done when". Telling people to *download* it
 waits on Phase 8, and converting them waits on Phase 6.
 
 Plan behind all of this: https://claude.ai/code/artifact/098c2efa-faa4-4f9c-a5e4-d4783dc9b4c9
-Prototype and eval baseline: `../calorie-tracker` (keep it working — Danny uses it daily)
+Prototype: retired 2026-11-01 (Danny's call). Style reference, eval baseline and
+suggestion scoring are archived in `reference/prototype/`.
 
 ---
 
@@ -178,6 +177,7 @@ A physical iPhone waits on the Apple membership, deferred by choice.)*
 
 **Done when:** Danny can stop using the localhost prototype for a full day without
 missing anything.
+*(Met 2026-11-01: Danny retired the prototype and logs in the real app.)*
 
 ---
 
@@ -633,7 +633,7 @@ Where it already touches the plan:
 
 **Goal:** "what should I eat" on real data.
 
-- [ ] Port the macro-shape scoring from `../calorie-tracker/suggest.py`
+- [ ] Port the macro-shape scoring from `reference/prototype/suggest.py`
 - [ ] Nine-at-a-time batching, three cards shown, background refill
 - [ ] One-tap accept-to-log
 - [ ] Skip and reject feedback into `suggestion_feedback`

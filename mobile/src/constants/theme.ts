@@ -7,7 +7,7 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
-// Brand tokens from PRODUCT.md / ../calorie-tracker/index.html. Full hand-drawn
+// Brand tokens from PRODUCT.md / reference/prototype/index.html. Full hand-drawn
 // treatment (wobble borders, offset shadows) is deferred — see PRODUCT.md's
 // porting note — this is just the color/type swap so the app isn't template-blue.
 export const Brand = {

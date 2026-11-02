@@ -1,7 +1,8 @@
 # SNACK TRACK
 
-The real app. The working prototype lives next door in `../calorie-tracker` and
-stays running — it's the eval harness and the daily driver until this replaces it.
+The real app. The original prototype was retired 2026-11-01; what's still used
+from it is archived in `reference/prototype/` (style reference, eval baseline,
+suggestion scoring).
 
 - `PRODUCT.md` — what this is and what it refuses to be. Read first.
 - `ROADMAP.md` — the work queue, in order

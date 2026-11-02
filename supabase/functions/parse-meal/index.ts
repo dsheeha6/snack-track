@@ -1,5 +1,5 @@
 // parse-meal — turns a sentence like "3 eggs on sourdough with sriracha" into
-// the same {items, totals} shape ../../calorie-tracker/parse.py produces, so it
+// the same {items, totals} shape reference/prototype/parse.py produces, so it
 // drops straight into the existing UI and the eval harness scores both the same
 // way.
 //
